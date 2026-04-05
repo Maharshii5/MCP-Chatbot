@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
         console.log(`Received file: ${file.name} (${file.size} bytes)`);
 
         console.log('Step 1: Parsing document...');
-        const text = await parseDocument(buffer, file.type);
+        const text = await parseDocument(buffer, file.type, file.name);
         console.log(`Parsed text length: ${text.length}`);
 
         console.log('Step 2: Chunking text...');

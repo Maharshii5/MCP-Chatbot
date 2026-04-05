@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { messages, conversationId: existingId, toolPreference, activeFileNames } = await req.json();
+        const { messages, conversationId: existingId, toolPreference, activeFileNames, model } = await req.json();
         let conversationId = existingId;
         // 1. Create conversation if it doesn't exist
         if (!conversationId) {
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
             content: lastUserMessage.content,
         });
 
-        const stream = await streamChat(user.id, messages as ChatCompletionMessageParam[], toolPreference, activeFileNames);
+        const stream = await streamChat(user.id, messages as ChatCompletionMessageParam[], toolPreference, activeFileNames, undefined, model);
 
         let assistantContent = '';
         const responseStream = new ReadableStream({

@@ -1,4 +1,5 @@
-import { groq, DEFAULT_MODEL } from '@/lib/groq/client';
+import { getGroqClient, DEFAULT_MODEL } from '@/lib/groq/client';
+import { getOpenRouterClient, OPENROUTER_MODELS } from '@/lib/openrouter/client';
 import { MCP_TOOLS } from '@/lib/mcp/tools';
 import { searchDocuments } from '@/lib/rag/pinecone'; // Added import
 import { dispatchToolCall } from '@/lib/mcp/dispatcher';
@@ -38,23 +39,29 @@ export async function resolveToolCalls(
     messages: ChatCompletionMessageParam[],
     tools: ChatCompletionTool[],
     activeFileNames?: string[],
-    onToolCall?: (tool: string, args: any) => void
+    onToolCall?: (tool: string, args: any) => void,
+    model: string = DEFAULT_MODEL
 ): Promise<ChatCompletionMessageParam[]> {
     const conversation = [...messages];
     let retryCount = 0;
 
     while (retryCount < 5) {
         let responseMessage: any;
+        const isOpenRouter = OPENROUTER_MODELS.some(m => m.id === model);
+        const openrouter = getOpenRouterClient();
+        const groq = getGroqClient();
+        const llm = (isOpenRouter ? (openrouter as any) : (groq as any)) as any;
+
         try {
-            const response = await groq.chat.completions.create({
-                model: DEFAULT_MODEL,
+            const response = await llm.chat.completions.create({
+                model: model,
                 messages: sanitizeMessages(conversation),
                 tools: tools,
                 tool_choice: 'auto',
             });
             responseMessage = response.choices[0].message;
         } catch (error: any) {
-            console.error("FULL GROQ ERROR:", JSON.stringify(error, null, 2));
+            console.error(`FULL ${isOpenRouter ? 'OPENROUTER' : 'GROQ'} ERROR:`, JSON.stringify(error, null, 2));
 
             const status = error.status || error.statusCode || (error.error?.status) || 0;
             const errorBody = error.error || error.body?.error || error;
@@ -206,7 +213,8 @@ export async function streamChat(
     messages: ChatCompletionMessageParam[],
     toolPreference?: string,
     activeFileNames?: string[],
-    onToolCall?: (tool: string, args: any) => void
+    onToolCall?: (tool: string, args: any) => void,
+    model: string = DEFAULT_MODEL
 ) {
     let contextInjection: ChatCompletionMessageParam | null = null;
     let currentTools = MCP_TOOLS; // Use a new variable for tools
@@ -265,7 +273,9 @@ export async function streamChat(
         - web_search
         - document_search (Auto-active in 'My Docs' mode)
         - google_docs_create (Save text into a new Google Doc)
-        - image_generate (Generate images from text)`
+        - image_generate (Generate images from text)
+        - fs_read_file, fs_write_file, fs_list_dir (Edit and explore local codebase)
+        - shell_execute (Run terminal commands like 'npm test' or 'git status')`
     };
 
     // Context Trimming (Keep last 10 messages)
@@ -278,7 +288,7 @@ export async function streamChat(
     }
 
     // 3. Tool Phase
-    const conversationWithTools = await resolveToolCalls(userId, conversation, currentTools, activeFileNames, onToolCall);
+    const conversationWithTools = await resolveToolCalls(userId, conversation, currentTools, activeFileNames, onToolCall, model);
 
     // 4. Final Summary Pass
     const summaryPrompt: ChatCompletionMessageParam = {
@@ -334,8 +344,13 @@ export async function streamChat(
         lastMessage.content += "\n(Remember: Use the 'document_search' tool to answer this based on my uploaded docs.)";
     }
 
-    return await groq.chat.completions.create({
-        model: DEFAULT_MODEL,
+    const isOpenRouter = OPENROUTER_MODELS.some(m => m.id === model);
+    const openrouter = getOpenRouterClient();
+    const groq = getGroqClient();
+    const llm = isOpenRouter ? (openrouter as any) : (groq as any);
+
+    return await llm.chat.completions.create({
+        model: model,
         messages: sanitizeMessages(finalMessages),
         stream: true,
     });

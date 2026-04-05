@@ -137,27 +137,61 @@ export const MCP_TOOLS: ChatCompletionTool[] = [
             },
         },
     },
-    // Image Generation
+    // Local Shell MCP (Autonomous Engineer)
     {
         type: "function",
         function: {
-            name: "image_generate",
-            description: "Generate an image using Kie.ai GPT Image 1 (powered by OpenAI). Use this whenever the user asks to create, draw, or generate an image/picture.",
+            name: "fs_read_file",
+            description: "Read the content of a local file in the workspace. Use this to examine code before editing.",
+            parameters: {
+                type: "object",
+                required: ["filePath"],
+                properties: {
+                    filePath: { type: "string", description: "Relative path to the file (e.g., 'src/app/page.tsx')" },
+                },
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "fs_write_file",
+            description: "Write content to a local file. Use this to implement new features, fix bugs, or add comments.",
+            parameters: {
+                type: "object",
+                required: ["filePath", "content"],
+                properties: {
+                    filePath: { type: "string", description: "Relative path to the file" },
+                    content: { type: "string", description: "Complete content to write to the file" },
+                },
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "fs_list_dir",
+            description: "List the contents of a directory in the workspace.",
             parameters: {
                 type: "object",
                 properties: {
-                    prompt: {
-                        type: "string",
-                        description: "A detailed description of the image to generate"
-                    },
-                    aspectRatio: {
-                        type: "string",
-                        enum: ["1:1", "16:9", "4:3", "3:4"],
-                        description: "The aspect ratio of the generated image (default: 1:1)"
-                    }
+                    dirPath: { type: "string", description: "Relative path to the directory (default: '.')" },
                 },
-                required: ["prompt"]
-            }
-        }
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "shell_execute",
+            description: "Execute a shell command in the workspace terminal (e.g., 'npm test', 'git status', 'ls -la').",
+            parameters: {
+                type: "object",
+                required: ["command"],
+                properties: {
+                    command: { type: "string", description: "The shell command to run" },
+                },
+            },
+        },
     }
 ];

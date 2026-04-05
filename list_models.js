@@ -2,7 +2,7 @@ const fs = require('fs');
 
 async function list() {
     try {
-        const env = fs.readFileSync('.env.local', 'utf8');
+        const env = fs.readFileSync('.env', 'utf8');
         const match = env.match(/GOOGLE_GENERATIVE_AI_API_KEY=(.*)/);
         if (!match) { console.log("No Key"); return; }
         const key = match[1].trim();

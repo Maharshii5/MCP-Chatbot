@@ -36,7 +36,7 @@ export default function Home() {
       .eq('user_id', userId)
       .order('updated_at', { ascending: false });
 
-    if (!error) setConversations(data as any);
+    if (!error) setConversations(data as any || []);
     setLoading(false);
   };
 
@@ -58,6 +58,7 @@ export default function Home() {
         }}
         view={view}
         onViewChange={setView}
+        onRefresh={() => user && fetchConversations(user.id)}
       />
 
       {view === 'chat' ? (

@@ -10,6 +10,10 @@ import {
 import ReactMarkdown from 'react-markdown';
 import { createClient } from '@/lib/supabase/client';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { OPENROUTER_MODELS } from '@/lib/openrouter/client';
+import { DEFAULT_MODEL } from '@/lib/groq/client';
+import { useAudio } from './Effects/WorkstationAudio';
+import CommandPalette from './CommandPalette';
 
 type ToolType = 'default' | 'web' | 'rag' | 'gmail' | 'calendar' | 'drive' | 'docs';
 
@@ -56,6 +60,11 @@ export default function ChatWindow({ conversationId, onConversationCreated }: an
         drive: { enabled: true, writeAccess: false },
         docs: { enabled: true, writeAccess: false }
     });
+    const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
+    const [showModelSelector, setShowModelSelector] = useState(false);
+    const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+
+    const { playClick, playSuccess, playDataHum } = useAudio();
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -133,7 +142,19 @@ export default function ChatWindow({ conversationId, onConversationCreated }: an
         return () => window.removeEventListener('focus', handleFocus);
     }, []);
 
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                setIsCommandPaletteOpen(prev => !prev);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
     const toggleRagFile = (fileName: string) => {
+        playClick();
         setSelectedRagFiles(prev => {
             const newSelection = prev.includes(fileName)
                 ? prev.filter(f => f !== fileName)
@@ -204,14 +225,24 @@ export default function ChatWindow({ conversationId, onConversationCreated }: an
         }
     }, [messages, loading]);
 
+    const allModels = [
+        { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B', provider: 'Groq (Fast)' },
+        { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B', provider: 'Groq (Flash)' },
+        ...OPENROUTER_MODELS
+    ];
+
+    const currentModelName = allModels.find(m => m.id === selectedModel)?.name || 'Select Model';
+
     const handleSend = async (customInput?: string) => {
         const textToSend = customInput || input;
         if (!textToSend.trim() || loading) return;
 
+        playClick();
         const userMessage = { role: 'user', content: textToSend };
         setMessages((prev) => [...prev, userMessage]);
         if (!customInput) setInput('');
         setLoading(true);
+        playDataHum(true);
 
         try {
             const response = await fetch('/api/chat', {
@@ -222,7 +253,8 @@ export default function ChatWindow({ conversationId, onConversationCreated }: an
                     conversationId,
                     toolPreference: activeTool,
                     activeFileNames: activeTool === 'rag' ? selectedRagFiles : [],
-                    mcpConfig: mcpPermissions // Pass MCP permissions to backend
+                    mcpConfig: mcpPermissions,
+                    model: selectedModel
                 }),
             });
 
@@ -253,10 +285,12 @@ export default function ChatWindow({ conversationId, onConversationCreated }: an
                     return [...prev.slice(0, -1), { ...last, content: assistantContent }];
                 });
             }
+            playSuccess();
         } catch (error: any) {
             alert(error.message);
         } finally {
             setLoading(false);
+            playDataHum(false);
         }
     };
 
@@ -318,7 +352,10 @@ export default function ChatWindow({ conversationId, onConversationCreated }: an
                 {/* Header / Monitor Bar */}
                 <div className="chat-header-bar">
                     <div className="ai-status">
-                        <div className={`ai-orb ${loading ? 'thinking' : ''}`} />
+                        <div className={`ai-orb ${loading ? 'thinking' : ''}`}>
+                            <div className="orb-inner" />
+                            <div className="orb-glow" />
+                        </div>
                         <span className="ai-name">MCP Assistant</span>
 
                         <div className="service-monitor-glass flex items-center ml-4 gap-2 border-l border-white/5 pl-4">
@@ -343,171 +380,139 @@ export default function ChatWindow({ conversationId, onConversationCreated }: an
                 </div>
 
                 {/* Messages Area */}
-                <div className="messages-list-refactored" ref={scrollRef}>
-                    <div className="cyber-grid-overlay" />
-                    <AnimatePresence mode="popLayout">
-                        {messages.length === 0 && (
-                            <motion.div
-                                key="welcome-section"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="welcome-section"
+                <div className="messages-list" ref={scrollRef}>
+                    {messages.length === 0 && (
+                        <div className="welcome-container">
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.5 }}
+                                className="welcome-hero"
                             >
-                                <motion.h1
-                                    className="mesh-text"
-                                    animate={{ scale: [1, 1.02, 1] }}
-                                    transition={{ duration: 4, repeat: Infinity }}
-                                >
-                                    How can I help you?
-                                </motion.h1>
-                                <p className="welcome-subtitle">Connect your Google services or query your docs to get started.</p>
-
-                                {/* Bento Grid Suggested Prompts */}
-                                <div className="bento-grid">
-                                    {suggestedPrompts.map((p, idx) => (
-                                        <motion.button
-                                            key={idx}
-                                            whileHover={{ scale: 1.05, rotate: 1, boxShadow: "0 0 20px rgba(88, 166, 255, 0.2)" }}
-                                            whileTap={{ scale: 0.95 }}
-                                            className="bento-tile"
-                                            onClick={() => {
-                                                setActiveTool(p.tool as ToolType);
-                                                handleSend(p.label);
-                                            }}
-                                        >
-                                            <div className="bento-icon">{p.icon}</div>
-                                            <span className="bento-label">{p.label}</span>
-                                            <div className="bento-glow" />
-                                        </motion.button>
-                                    ))}
+                                <div className="hero-badge">Professional Workstation</div>
+                                <h1 className="hero-title">Personal <span className="text-outline">MCP</span></h1>
+                                <p className="hero-subtitle">Intelligent multi-model agent connected to your Google Workspace and Local Knowledge Base.</p>
+                                
+                                <div className="hero-features">
+                                    <div className="feature-item">
+                                        <div className="feature-icon"><Database size={16} /></div>
+                                        <span>Full RAG Knowledge</span>
+                                    </div>
+                                    <div className="feature-item">
+                                        <div className="feature-icon"><Mail size={16} /></div>
+                                        <span>Google Services</span>
+                                    </div>
+                                    <div className="feature-item">
+                                        <div className="feature-icon"><Cpu size={16} /></div>
+                                        <span>Multi-Model Intelligence</span>
+                                    </div>
                                 </div>
                             </motion.div>
-                        )}
+                        </div>
+                    )}
 
-                        <LayoutGroup>
-                            {messages.map((m, i) => (
-                                <motion.div
-                                    key={`msg-${i}`}
-                                    layout
-                                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    transition={{ type: "spring", stiffness: 100, damping: 20 }}
-                                    className={`message-v2 ${m.role}`}
-                                >
-                                    <div className="message-content">
-                                        <ReactMarkdown>{m.content}</ReactMarkdown>
-                                    </div>
-                                    <div className="message-time">
-                                        {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </LayoutGroup>
-
-                        {loading && (
-                            <motion.div
-                                key="thinking-indicator"
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                className="thinking-indicator-v2"
+                    {messages.map((m, i) => (
+                        <motion.div 
+                            key={`msg-${i}`} 
+                            initial={{ opacity: 0, y: 30, rotateX: -10 }}
+                            animate={{ opacity: 1, y: 0, rotateX: 0 }}
+                            transition={{ duration: 0.4, delay: i * 0.05 }}
+                            className={`message ${m.role}`}
+                            style={{ perspective: 1000 }}
+                        >
+                            <div className="message-avatar">
+                                {m.role === 'user' ? 'U' : 'AI'}
+                            </div>
+                            <motion.div 
+                                className="message-bubble"
+                                whileHover={m.role === 'assistant' ? { rotateY: 2, rotateX: -2, translateZ: 10 } : {}}
                             >
-                                <div className="orb-small thinking" />
-                                <span>Assistant is thinking...</span>
+                                <div className="message-content">
+                                    <ReactMarkdown>{m.content}</ReactMarkdown>
+                                </div>
                             </motion.div>
-                        )}
-                    </AnimatePresence>
+                        </motion.div>
+                    ))}
+
+                    {loading && (
+                        <div className="thinking-chip">
+                            <div className="thinking-dots">
+                                <span></span><span></span><span></span>
+                            </div>
+                            <span>AI is thinking with {currentModelName}...</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Input Area */}
-                <div className="input-area-glass">
-                    <div className="input-container-astral">
-                        {/* RAG File Selector Dropdown Integration */}
-                        {activeTool === 'rag' && (
-                            <div className="rag-selector-compact">
-                                <button className="rag-compact-toggle" onClick={() => setShowRagSelector(!showRagSelector)}>
-                                    <Database size={12} />
-                                    <span>{selectedRagFiles.length || 'No'} docs</span>
-                                    <ChevronRight size={12} className={showRagSelector ? 'rotate-90' : ''} />
-                                </button>
-                                <AnimatePresence>
-                                    {showRagSelector && (
-                                        <motion.div
-                                            initial={{ opacity: 0, height: 0 }}
-                                            animate={{ opacity: 1, height: 'auto' }}
-                                            exit={{ opacity: 0, height: 0 }}
-                                            className="rag-dropdown-glass"
-                                        >
-                                            <div className="rag-dropdown-header">
-                                                <button onClick={toggleAllRagFiles} className="text-xs text-indigo-400 hover:text-indigo-300">
-                                                    {selectedRagFiles.length === documents.length ? 'Unselect All' : 'Select All'}
-                                                </button>
-                                            </div>
-                                            {documents.map((doc, dIdx) => (
-                                                <div key={`${doc.id}-${dIdx}`} className="rag-item-glass" onClick={() => toggleRagFile(doc.file_name)}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedRagFiles.includes(doc.file_name)}
-                                                        onChange={() => { }} /* Handled by parent div for better mobile/hitbox support */
-                                                        readOnly
-                                                    />
-                                                    <span className="text-truncate">{doc.file_name}</span>
-                                                </div>
-                                            ))}
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
-                        )}
-
-                        <div className="tool-chips-bar">
-                            {(Object.keys(toolConfig) as Array<keyof typeof toolConfig>).map((t, tIdx) => (
-                                <button
-                                    key={`tool-${tIdx}`}
-                                    className={`tool-chip ${activeTool === t ? 'active' : ''}`}
-                                    onClick={() => setActiveTool(t as ToolType)}
-                                    style={{
-                                        '--tool-color': toolConfig[t].color,
-                                        boxShadow: activeTool === t ? `0 0 10px ${toolConfig[t].color}` : 'none',
-                                        borderColor: activeTool === t ? toolConfig[t].color : 'var(--border-color)'
-                                    } as any}
-                                >
-                                    {t === 'default' ? 'AI' : toolConfig[t].label.split(' ')[0]}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="input-row">
-                            <button className="action-btn-glass" onClick={() => fileInputRef.current?.click()} title="Attach File">
-                                {uploading ? <Loader2 className="animate-spin" size={18} /> : <Paperclip size={18} />}
-                            </button>
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                style={{ display: 'none' }}
-                                onChange={handleFileUpload}
-                            />
-
-                            <div className="textarea-container-glass">
-                                <textarea
-                                    value={input}
-                                    onChange={(e) => setInput(e.target.value)}
-                                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                                    placeholder="Message MCP Assistant..."
-                                    rows={1}
-                                />
-                            </div>
-
-                            <motion.button
-                                className="liquid-send-btn"
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => handleSend()}
+                <div className="input-area">
+                    <div className="input-top-bar">
+                        <div className="model-selector-container">
+                            <button 
+                                className={`current-model-btn ${showModelSelector ? 'active' : ''}`}
+                                onClick={() => setShowModelSelector(!showModelSelector)}
                             >
-                                <Send size={18} />
-                            </motion.button>
+                                <Cpu size={14} />
+                                <span>{currentModelName}</span>
+                                <ChevronRight size={14} className={showModelSelector ? 'rotate-90' : ''} />
+                            </button>
+                            
+                            <AnimatePresence>
+                                {showModelSelector && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        className="model-dropdown"
+                                    >
+                                        <div className="dropdown-label">Select Model</div>
+                                        <div className="model-grid">
+                                            {allModels.map(m => (
+                                                <button 
+                                                    key={m.id}
+                                                    className={`model-item ${selectedModel === m.id ? 'active' : ''}`}
+                                                    onClick={() => {
+                                                        setSelectedModel(m.id);
+                                                        setShowModelSelector(false);
+                                                    }}
+                                                >
+                                                    <div className="model-name">{m.name}</div>
+                                                    <div className="model-provider">{m.provider}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
                     </div>
-                    <div className="input-footer-text">
+
+                    <div className="input-wrapper focus-glow">
+                        <button className="input-action-btn" title="Attach File" onClick={() => fileInputRef.current?.click()}>
+                            {uploading ? <Loader2 className="animate-spin" size={18} /> : <Paperclip size={18} />}
+                        </button>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            style={{ display: 'none' }}
+                            onChange={handleFileUpload}
+                        />
+                        <textarea
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                            placeholder={`Message ${currentModelName}...`}
+                            rows={1}
+                        />
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="send-btn"
+                            onClick={() => handleSend()}
+                            disabled={!input.trim() || loading}
+                        >
+                            <Send size={18} />
+                        </motion.button>
                     </div>
                 </div>
             </div>
@@ -583,6 +588,13 @@ export default function ChatWindow({ conversationId, onConversationCreated }: an
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            <CommandPalette 
+                isOpen={isCommandPaletteOpen}
+                onClose={() => setIsCommandPaletteOpen(false)}
+                onSelectModel={setSelectedModel}
+                onToggleSettings={setShowMcpSettings}
+            />
         </div>
     );
 }

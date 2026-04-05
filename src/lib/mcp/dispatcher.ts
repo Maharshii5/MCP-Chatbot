@@ -10,6 +10,7 @@ import {
 import { searchWeb } from '../search/tavily';
 import { searchDocuments } from '../rag/pinecone';
 import { generateImage } from './image';
+import { fsReadFile, fsWriteFile, fsListDir, shellExecute } from './shell';
 
 export async function dispatchToolCall(userId: string, functionName: string, args: any, activeFileNames?: string[]) {
     console.log(`Dispatching tool call: ${functionName}`, args);
@@ -35,6 +36,14 @@ export async function dispatchToolCall(userId: string, functionName: string, arg
             return await searchDocuments(userId, args.query, activeFileNames);
         case 'image_generate':
             return await generateImage(args.prompt, args.aspectRatio);
+        case 'fs_read_file':
+            return await fsReadFile(args.filePath);
+        case 'fs_write_file':
+            return await fsWriteFile(args.filePath, args.content);
+        case 'fs_list_dir':
+            return await fsListDir(args.dirPath);
+        case 'shell_execute':
+            return await shellExecute(args.command);
         default:
             throw new Error(`Unknown tool: ${functionName}`);
     }

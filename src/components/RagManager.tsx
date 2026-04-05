@@ -140,13 +140,12 @@ export default function RagManager() {
                     <input type="file" accept=".txt,.md,.pdf,.docx" onChange={handleUpload} disabled={uploading} hidden />
                     {uploading ? (
                         <div className="upload-content">
-                            <Loader2 className="spinner" />
+                            <Loader2 className="animate-spin text-secondary" />
                             <span>Processing & Indexing...</span>
-                            <span className="upload-hint">Converting text to embeddings with Gemini</span>
                         </div>
                     ) : (
                         <div className="upload-content">
-                            <Upload className="upload-icon" />
+                            <Upload className="text-secondary" />
                             <span>Click to upload PDF, Docx, or TXT</span>
                             <span className="upload-hint">Max file size: 10MB</span>
                         </div>
@@ -166,7 +165,7 @@ export default function RagManager() {
 
                 {loading ? (
                     <div className="doc-loading">
-                        <Loader2 className="spinner" />
+                        <Loader2 className="animate-spin" />
                     </div>
                 ) : documents.length === 0 ? (
                     <div className="empty-docs">
@@ -180,9 +179,6 @@ export default function RagManager() {
                                 <motion.div
                                     key={doc.id}
                                     layout
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.9 }}
                                     className={`doc-card ${selectedFiles.includes(doc.file_name) ? 'selected' : ''}`}
                                     onClick={() => toggleFileSelection(doc.file_name)}
                                 >
@@ -190,7 +186,7 @@ export default function RagManager() {
                                         {selectedFiles.includes(doc.file_name) && <Check size={14} />}
                                     </div>
                                     <div className="doc-info">
-                                        <FileText className="doc-icon" />
+                                        <FileText className="doc-icon text-secondary" />
                                         <div className="doc-details">
                                             <span className="doc-name text-truncate">{doc.file_name}</span>
                                             <span className="doc-date">{new Date(doc.created_at).toLocaleDateString()}</span>
@@ -219,7 +215,7 @@ export default function RagManager() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 20 }}
-                        className={`rag-notification ${notification.type}`}
+                        className={`toast-notification ${notification.type}`}
                     >
                         {notification.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
                         <span>{notification.message}</span>

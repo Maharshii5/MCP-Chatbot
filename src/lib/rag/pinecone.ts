@@ -11,7 +11,7 @@ const pc = new Pinecone({
 
 export const embeddings = new GoogleGenerativeAIEmbeddings({
     apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY!,
-    modelName: "text-embedding-004", // Use newer model
+    modelName: "gemini-embedding-001", // Use working model
 });
 
 const wait = (ms: number) => new Promise(res => setTimeout(res, ms));

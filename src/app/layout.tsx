@@ -20,6 +20,9 @@ export const metadata: Metadata = {
   description: "A production-ready AI chat application with Groq, MCP, and RAG.",
 };
 
+import GrainShader from "@/components/Effects/GrainShader";
+import { AudioProvider } from "@/components/Effects/WorkstationAudio";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -28,7 +31,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        {children}
+        <AudioProvider>
+          <GrainShader />
+          {children}
+        </AudioProvider>
       </body>
     </html>
   );
