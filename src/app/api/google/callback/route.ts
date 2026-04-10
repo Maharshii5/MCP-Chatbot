@@ -21,10 +21,11 @@ export async function GET(request: Request) {
     try {
         const { tokens } = await oauth2Client.getToken(code);
         const supabase = await createClient();
+        let connectedServices: Record<string, boolean> = {};
 
         // 1. Update Profile Tokens
-        const updateData: any = {
-            google_access_token: tokens.access_token,
+        const updateData: Record<string, string | null> = {
+            google_access_token: tokens.access_token || null,
             updated_at: new Date().toISOString(),
         };
 
@@ -49,6 +50,7 @@ export async function GET(request: Request) {
             } else if (targetService) {
                 newServices[targetService] = true;
             }
+            connectedServices = newServices;
 
             await supabase.auth.updateUser({
                 data: {
@@ -58,7 +60,35 @@ export async function GET(request: Request) {
             });
         }
 
-        return NextResponse.redirect(`${origin}/?success=google-connected`);
+        const response = NextResponse.redirect(`${origin}/?success=google-connected`);
+        response.cookies.set('demo-google-access-token', tokens.access_token || '', {
+            path: '/',
+            maxAge: 60 * 60 * 24 * 30,
+            sameSite: 'lax',
+        });
+        response.cookies.set('demo-google-refresh-token', tokens.refresh_token || '', {
+            path: '/',
+            maxAge: 60 * 60 * 24 * 30,
+            sameSite: 'lax',
+        });
+        response.cookies.set('demo-google-token-expires-at', tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : '', {
+            path: '/',
+            maxAge: 60 * 60 * 24 * 30,
+            sameSite: 'lax',
+        });
+        const encodedServices = encodeURIComponent(JSON.stringify(connectedServices));
+        response.cookies.set('demo-google-services', encodedServices, {
+            path: '/',
+            maxAge: 60 * 60 * 24 * 30,
+            sameSite: 'lax',
+        });
+        response.cookies.set('demo-google-services-scopes', tokens.scope || '', {
+            path: '/',
+            maxAge: 60 * 60 * 24 * 30,
+            sameSite: 'lax',
+        });
+
+        return response;
     } catch (error) {
         console.error('Google OAuth Callback Error:', error);
         return NextResponse.redirect(`${origin}/?error=google-auth-failed`);

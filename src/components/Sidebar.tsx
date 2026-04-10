@@ -1,20 +1,25 @@
 'use client'
 
-import { Plus, MessageSquare, LogOut, Database, Settings, Trash2, Edit2, Check, X } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
-import { useRouter } from 'next/navigation';
+import { Plus, MessageSquare, Database, Trash2, Edit2, Check, X } from 'lucide-react';
 import { useState } from 'react';
 
-export default function Sidebar({ conversations, currentConvId, onSelect, view, onViewChange, onRefresh }: any) {
-    const supabase = createClient();
-    const router = useRouter();
+interface Conversation {
+    id: string;
+    title: string;
+}
+
+interface SidebarProps {
+    conversations: Conversation[];
+    currentConvId: string | null;
+    onSelect: (id: string | null) => void;
+    view: 'chat' | 'rag';
+    onViewChange: (view: 'chat' | 'rag') => void;
+    onRefresh: () => void;
+}
+
+export default function Sidebar({ conversations, currentConvId, onSelect, view, onViewChange, onRefresh }: SidebarProps) {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editTitle, setEditTitle] = useState('');
-
-    const handleSignOut = async () => {
-        await supabase.auth.signOut();
-        router.push('/login');
-    };
 
     const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -76,7 +81,7 @@ export default function Sidebar({ conversations, currentConvId, onSelect, view, 
 
             <div className="conv-list">
                 <h3 style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', padding: '0 0.75rem', marginBottom: '1rem', marginTop: '1rem', letterSpacing: '0.05em' }}>Recent Tool Chats</h3>
-                {conversations.map((conv: any) => (
+                {conversations.map((conv) => (
                     <div
                         key={conv.id}
                         className={`conv-item ${currentConvId === conv.id && view === 'chat' ? 'active' : ''}`}
@@ -109,12 +114,9 @@ export default function Sidebar({ conversations, currentConvId, onSelect, view, 
                 ))}
             </div>
 
-            <button
-                onClick={handleSignOut}
-                className="sign-out-btn"
-            >
-                <LogOut size={16} /> Sign out
-            </button>
+            <div className="sign-out-btn" style={{ cursor: 'default', color: 'var(--text-muted)' }}>
+                Local mode
+            </div>
             <style jsx>{`
                 .conv-item:hover .actions {
                     display: flex !important;

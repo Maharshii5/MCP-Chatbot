@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Search, Cpu, Database, Settings, Shield, X, Command } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Search, Cpu, Database, Settings, Shield, Command } from 'lucide-react'
 
 interface CommandItem {
   id: string;
@@ -12,13 +12,19 @@ interface CommandItem {
   category: string;
 }
 
-export default function CommandPalette({ isOpen, onClose, onSelectModel, onToggleSettings }: any) {
+interface CommandPaletteProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectModel: (modelId: string) => void;
+  onToggleSettings: (open: boolean) => void;
+}
+
+export default function CommandPalette({ isOpen, onClose, onSelectModel, onToggleSettings }: CommandPaletteProps) {
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (isOpen) {
-      setQuery('')
       setTimeout(() => inputRef.current?.focus(), 100)
     }
   }, [isOpen])

@@ -3,9 +3,10 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function DELETE(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params;
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
 
@@ -16,23 +17,25 @@ export async function DELETE(
         const { error } = await supabase
             .from('conversations')
             .delete()
-            .eq('id', params.id)
+            .eq('id', id)
             .eq('user_id', user.id);
 
         if (error) throw error;
 
         return NextResponse.json({ success: true });
-    } catch (error: any) {
+    } catch (error) {
         console.error('DELETE Conversation Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Failed to delete conversation';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
 
 export async function PATCH(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params;
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
 
@@ -49,14 +52,15 @@ export async function PATCH(
         const { error } = await supabase
             .from('conversations')
             .update({ title })
-            .eq('id', params.id)
+            .eq('id', id)
             .eq('user_id', user.id);
 
         if (error) throw error;
 
         return NextResponse.json({ success: true });
-    } catch (error: any) {
+    } catch (error) {
         console.error('PATCH Conversation Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        const message = error instanceof Error ? error.message : 'Failed to update conversation';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

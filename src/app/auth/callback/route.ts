@@ -24,7 +24,7 @@ export async function GET(request: Request) {
                 .eq('id', user.id)
                 .single();
 
-            const profileData: any = {
+            const profileData: Record<string, string | undefined> = {
                 id: user.id,
                 full_name: user.user_metadata.full_name,
                 avatar_url: user.user_metadata.avatar_url,
@@ -46,5 +46,5 @@ export async function GET(request: Request) {
     }
 
     // return the user to an error page with instructions
-    return NextResponse.redirect(`${origin}/login?error=auth-failed`);
+    return NextResponse.redirect(`${origin}/?error=auth-failed`);
 }

@@ -34,8 +34,8 @@ export async function getGoogleAuthClient(userId: string) {
         try {
             const res = await oauth2Client.refreshAccessToken();
             const tokens = res.credentials;
-            const updateData: any = {
-                google_access_token: tokens.access_token,
+            const updateData: Record<string, string | null> = {
+                google_access_token: tokens.access_token || null,
                 updated_at: new Date().toISOString(),
             };
             if (tokens.expiry_date) {

@@ -28,6 +28,39 @@ function sanitizeMessages(messages: ChatCompletionMessageParam[]): ChatCompletio
 }
 // ... (rest of imports)
 
+function parseMalformedFunctionTag(raw: string): { name: string; args: Record<string, unknown> } | null {
+    let tag = raw.trim();
+    if (!tag.startsWith('<function=')) return null;
+
+    tag = tag.replace(/^<function=/i, '').replace(/<\/function>\s*$/i, '').trim();
+    tag = tag.endsWith('>') ? tag.slice(0, -1).trim() : tag;
+
+    const nameMatch = tag.match(/^([a-zA-Z0-9_]+)/);
+    if (!nameMatch) return null;
+
+    const name = nameMatch[1];
+    let rest = tag.slice(name.length).trim();
+    rest = rest.replace(/^,/, '').trim();
+
+    if (!rest) {
+        return { name, args: {} };
+    }
+
+    const jsonStart = rest.indexOf('{');
+    const jsonEnd = rest.lastIndexOf('}');
+    if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
+        return { name, args: {} };
+    }
+
+    const jsonPart = rest.slice(jsonStart, jsonEnd + 1);
+    try {
+        const parsed = JSON.parse(jsonPart) as Record<string, unknown>;
+        return { name, args: parsed };
+    } catch {
+        return { name, args: {} };
+    }
+}
+
 
 /**
  * Resolves all tool calls in a conversation non-streaming.
@@ -97,17 +130,9 @@ export async function resolveToolCalls(
 
             if (status === 400 && malformed) {
                 console.log('RECOVERYING TOOL CALL:', malformed);
-                const match = malformed.match(/<function=([^=, >(]+)[\s=,(]*([\s\S]*?)(?:<\/function>|>|$)/i);
+                const parsed = parseMalformedFunctionTag(malformed);
 
-                if (match) {
-                    const name = match[1].trim();
-                    let args = {};
-                    try {
-                        let argsJson = match[2].trim();
-                        argsJson = argsJson.replace(/<\/function>[\s\S]*/i, '').replace(/>[\s\S]*/, '').replace(/\)[\s\S]*/, '');
-                        args = JSON.parse(argsJson);
-                    } catch (e) { console.warn('JSON parse fallback for args'); }
-
+                if (parsed) {
                     const cleanContent = malformed.replace(/<function=[\s\S]*?(?:<\/function>|>|$)/gi, '').trim();
 
                     responseMessage = {
@@ -116,7 +141,7 @@ export async function resolveToolCalls(
                         tool_calls: [{
                             id: `call_${Math.random().toString(36).substr(2, 10)}`,
                             type: 'function',
-                            function: { name, arguments: JSON.stringify(args) }
+                            function: { name: parsed.name, arguments: JSON.stringify(parsed.args) }
                         }]
                     };
                 } else {
@@ -190,6 +215,10 @@ export async function resolveToolCalls(
                         tool_call_id: toolCall.id,
                         content: JSON.stringify({ error: error.message }),
                     } as any);
+
+                    if (typeof error.message === 'string' && error.message.startsWith('Unknown tool:')) {
+                        shouldStop = true;
+                    }
                 }
             }
 
