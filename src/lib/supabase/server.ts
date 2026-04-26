@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import type { ReadonlyRequestCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies'
 
-const FORCE_DEMO_MODE = true
+const FORCE_DEMO_MODE = false
 type ServerClient = ReturnType<typeof createServerClient>
 
 const demoUserBase = {
@@ -149,7 +149,7 @@ function createDemoServerClient(cookieStore: ReadonlyRequestCookies): ServerClie
 
 export async function createClient() {
     const cookieStore = await cookies()
-    const isDemo = FORCE_DEMO_MODE || cookieStore.has('demo-session')
+    const isDemo = false;
 
     if (isDemo) {
         return createDemoServerClient(cookieStore)

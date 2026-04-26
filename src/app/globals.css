@@ -780,3 +780,38 @@ body::before {
 .tool-chip:hover { border-color: var(--border-hover); color: var(--text-secondary); }
 .tool-chip.active { background: var(--accent-soft); border-color: var(--tool-color, var(--text-primary)); color: var(--text-primary); box-shadow: 0 0 10px rgba(255, 255, 255, 0.05); }
 .tool-chip.active svg { color: var(--tool-color, var(--text-primary)); }
+
+/* Markdown Table Styles */
+.message-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.message-content th, .message-content td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.75rem 1rem;
+  text-align: left;
+}
+
+.message-content th {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+}
+
+.message-content tr:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.message-content tr:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}

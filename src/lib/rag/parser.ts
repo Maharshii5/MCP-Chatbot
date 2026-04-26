@@ -7,8 +7,7 @@ if (typeof globalThis !== 'undefined') {
 }
 
 import mammoth from 'mammoth';
-
-const pdf = require('pdf-parse');
+import { PDFParse } from 'pdf-parse';
 
 export async function parseDocument(buffer: Buffer, mimeType: string, fileName?: string): Promise<string> {
     try {
@@ -20,7 +19,9 @@ export async function parseDocument(buffer: Buffer, mimeType: string, fileName?:
 
         if (type === 'application/pdf') {
             console.log('Parsing PDF content...');
-            const data = await pdf(buffer);
+            // In pdf-parse ^2.4.5, PDFParse is a class instance.
+            const parser = new PDFParse({ data: buffer });
+            const data = await parser.getText();
             const content = data.text || '';
             if (content.trim().length === 0) {
                 console.warn('PDF parsed but returned no text! (Might be an image-only PDF)');

@@ -2,7 +2,7 @@ import { createBrowserClient } from '@supabase/ssr'
 
 type BrowserClient = ReturnType<typeof createBrowserClient>
 let browserClient: BrowserClient | null = null
-const FORCE_DEMO_MODE = true
+const FORCE_DEMO_MODE = false
 const demoUser = { id: 'demo-user-123', email: 'demo@mcp.internal' }
 
 function createDemoBrowserClient(): BrowserClient {
@@ -58,8 +58,7 @@ function createDemoBrowserClient(): BrowserClient {
 }
 
 export function createClient() {
-  const hasDemoCookie = typeof document !== 'undefined' && document.cookie.includes('demo-session=true');
-  const isDemo = FORCE_DEMO_MODE || hasDemoCookie;
+  const isDemo = false;
 
   if (isDemo) {
     return createDemoBrowserClient()

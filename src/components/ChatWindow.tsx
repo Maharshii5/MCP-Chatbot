@@ -8,6 +8,7 @@ import {
     Shield, ChevronRight, Zap, List
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { createClient } from '@/lib/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { OPENROUTER_MODELS } from '@/lib/openrouter/client';
@@ -475,7 +476,7 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
                             </div>
                             <div className="message-bubble">
                                 <div className="message-content">
-                                    <ReactMarkdown>{m.content}</ReactMarkdown>
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
                                 </div>
                             </div>
                         </div>
