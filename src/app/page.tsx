@@ -72,6 +72,7 @@ export default function Home() {
   return (
     <main className="main-layout">
       <Sidebar
+        user={user}
         conversations={conversations}
         currentConvId={currentConvId}
         onSelect={(id: string | null) => {
@@ -81,6 +82,12 @@ export default function Home() {
         view={view}
         onViewChange={setView}
         onRefresh={() => user && fetchConversations(user.id)}
+        onSignOut={async () => {
+          await supabase.auth.signOut();
+          setUser(null);
+          setConversations([]);
+          setCurrentConvId(null);
+        }}
       />
 
       {view === 'chat' ? (
