@@ -5,7 +5,7 @@ import {
     Send, Paperclip, Calendar, Mail, FileText,
     HardDrive, Globe, Database, Cpu,
     CheckCircle, AlertCircle, X, Loader2,
-    Shield, ChevronRight, Zap
+    Shield, ChevronRight, Zap, List
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { createClient } from '@/lib/supabase/client';
@@ -67,7 +67,9 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const [activeTool] = useState<ToolType>('default');
+    const [activeTool, setActiveTool] = useState<ToolType>('default');
+    const [showRagSelector, setShowRagSelector] = useState(false);
+    const [documents, setDocuments] = useState<any[]>([]);
     const [status, setStatus] = useState<ServiceStatus>({
         gmail: false,
         calendar: false,
@@ -95,9 +97,9 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
 
     // Color mapping for tools
     const toolConfig: ToolConfig = useMemo(() => ({
-        default: { color: '#58a6ff', label: 'Ask anything...', icon: <Cpu size={16} /> },
-        web: { color: '#3fb950', label: 'Search the web...', icon: <Globe size={16} /> },
-        rag: { color: '#bc8cff', label: 'Ask your documents...', icon: <Database size={16} /> },
+        default: { color: '#58a6ff', label: 'Ask assistant anything...', icon: <Cpu size={16} /> },
+        web: { color: '#3fb950', label: 'Search the web with Tavily...', icon: <Globe size={16} /> },
+        rag: { color: '#bc8cff', label: 'Ask your indexed documents...', icon: <Database size={16} /> },
         gmail: { color: '#ff7b72', label: 'Manage emails...', icon: <Mail size={16} /> },
         calendar: { color: '#3fb950', label: 'Check calendar...', icon: <Calendar size={16} /> },
         drive: { color: '#d29922', label: 'Search Drive...', icon: <HardDrive size={16} /> },
@@ -107,10 +109,14 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
     const [selectedRagFiles, setSelectedRagFiles] = useState<string[]>([]);
 
     const fetchStatus = async () => {
-        const res = await fetch('/api/google/status');
-        if (res.ok) {
-            const data = await res.json();
-            setStatus(data);
+        try {
+            const res = await fetch('/api/google/status');
+            if (res.ok) {
+                const data = await res.json();
+                setStatus(data);
+            }
+        } catch (err) {
+            console.error('Failed to fetch status');
         }
     };
 
@@ -127,9 +133,40 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
         }
     };
 
+    const fetchDocuments = async () => {
+        try {
+            const res = await fetch('/api/documents');
+            if (res.ok) {
+                const data = await res.json();
+                setDocuments(data);
+            }
+        } catch (err) {
+            console.error('Failed to fetch documents');
+        }
+    };
+
+    const toggleRagFile = (fileName: string) => {
+        const newSelection = selectedRagFiles.includes(fileName)
+            ? selectedRagFiles.filter(f => f !== fileName)
+            : [...selectedRagFiles, fileName];
+        
+        setSelectedRagFiles(newSelection);
+        localStorage.setItem('selected_rag_files', JSON.stringify(newSelection));
+    };
+
+    const toggleAllRagFiles = () => {
+        const newSelection = selectedRagFiles.length === documents.length
+            ? []
+            : documents.map(d => d.file_name);
+        
+        setSelectedRagFiles(newSelection);
+        localStorage.setItem('selected_rag_files', JSON.stringify(newSelection));
+    };
+
     useEffect(() => {
         fetchStatus();
         fetchSelectedRagFiles();
+        fetchDocuments();
         const interval = setInterval(fetchStatus, 30000); // Check every 30s
         return () => clearInterval(interval);
     }, []);
@@ -138,18 +175,19 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
     useEffect(() => {
         if (activeTool === 'rag') {
             fetchSelectedRagFiles();
+            fetchDocuments();
         }
     }, [activeTool]);
 
     useEffect(() => {
         const handleFocus = () => {
-            if (activeTool === 'rag') {
-                fetchSelectedRagFiles();
-            }
+            fetchSelectedRagFiles();
+            fetchDocuments();
+            fetchStatus();
         };
         window.addEventListener('focus', handleFocus);
         return () => window.removeEventListener('focus', handleFocus);
-    }, [activeTool]);
+    }, []);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -222,8 +260,8 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
     }, [messages, loading]);
 
     const allModels: ModelOption[] = [
-        { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B', provider: 'Groq (Fast)' },
-        { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B', provider: 'Groq (Flash)' },
+        { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B', provider: 'Groq' },
+        { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B', provider: 'Groq' },
         ...OPENROUTER_MODELS.map((model) => ({
             id: model.id,
             name: model.name,
@@ -325,7 +363,7 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
         if (!file) return;
 
         if (file.size > 10 * 1024 * 1024) {
-            setNotification({ message: "File too large (Max 10MB)", type: 'error' });
+            setNotification({ message: 'File too large (Max 10MB)', type: 'error' });
             return;
         }
 
@@ -336,13 +374,13 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
             const res = await fetch('/api/upload', { method: 'POST', body: formData });
             const data = await res.json();
             if (res.ok) {
-                setNotification({ message: `File "${file.name}" indexed successfully!`, type: 'success' });
+                setNotification({ message: 'File indexed successfully!', type: 'success' });
+                fetchDocuments();
             } else {
-                setNotification({ message: `Failed: ${data.error || 'Unknown error'}`, type: 'error' });
+                setNotification({ message: 'Failed to index', type: 'error' });
             }
         } catch (err) {
-            const message = err instanceof Error ? err.message : 'Unknown upload error';
-            setNotification({ message: `Upload error: ${message}`, type: 'error' });
+            setNotification({ message: 'Upload error', type: 'error' });
         } finally {
             setUploading(false);
             if (e.target) e.target.value = ''; // Reset file input
@@ -374,7 +412,7 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
                             <div className="orb-inner" />
                             <div className="orb-glow" />
                         </div>
-                        <span className="ai-name">MCP Assistant</span>
+                        <span className="ai-name">Nexus CORE AI</span>
 
                         <div className="service-monitor-glass flex items-center ml-4 gap-2 border-l border-white/5 pl-4">
                             <button
@@ -392,9 +430,7 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
                         </div>
                     </div>
 
-                    <div className="header-actions">
-                        {/* Right side kept for potential future persistent actions */}
-                    </div>
+                    <div className="header-actions" />
                 </div>
 
                 {/* Messages Area */}
@@ -407,22 +443,22 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
                                 transition={{ duration: 0.5 }}
                                 className="welcome-hero"
                             >
-                                <div className="hero-badge">Professional Workstation</div>
-                                <h1 className="hero-title">Personal <span className="text-outline">MCP</span></h1>
-                                <p className="hero-subtitle">Intelligent multi-model agent connected to your Google Workspace and Local Knowledge Base.</p>
+                                <div className="hero-badge">Autonomous Workstation v9</div>
+                                <h1 className="hero-title">Nexus <span className="text-outline">CORE</span></h1>
+                                <p className="hero-subtitle">Multi-tool synthesis engine with local RAG and Google Workspace integration.</p>
                                 
                                 <div className="hero-features">
                                     <div className="feature-item">
                                         <div className="feature-icon"><Database size={16} /></div>
-                                        <span>Full RAG Knowledge</span>
+                                        <span>Local RAG</span>
+                                    </div>
+                                    <div className="feature-item">
+                                        <div className="feature-icon"><Globe size={16} /></div>
+                                        <span>Web Search</span>
                                     </div>
                                     <div className="feature-item">
                                         <div className="feature-icon"><Mail size={16} /></div>
-                                        <span>Google Services</span>
-                                    </div>
-                                    <div className="feature-item">
-                                        <div className="feature-icon"><Cpu size={16} /></div>
-                                        <span>Multi-Model Intelligence</span>
+                                        <span>Google MCP</span>
                                     </div>
                                 </div>
                             </motion.div>
@@ -456,8 +492,25 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
                 </div>
 
                 {/* Input Area */}
-                <div className="input-area">
+                <div className="input-area" style={{ overflow: 'visible' }}>
                     <div className="input-top-bar">
+                        {/* Tool Selector */}
+                        <div className="tool-selector">
+                            {(['default', 'web', 'rag'] as ToolType[]).map((tool) => (
+                                <button
+                                    key={tool}
+                                    className={`tool-chip ${activeTool === tool ? 'active' : ''}`}
+                                    onClick={() => setActiveTool(tool)}
+                                    style={{
+                                        '--tool-color': toolConfig[tool].color
+                                    } as any}
+                                >
+                                    {toolConfig[tool].icon}
+                                    <span>{tool === 'rag' ? 'My Docs' : tool === 'web' ? 'Web Search' : 'Assistant'}</span>
+                                </button>
+                            ))}
+                        </div>
+
                         <div className="model-selector-container">
                             <button 
                                 className={`current-model-btn ${showModelSelector ? 'active' : ''}`}
@@ -498,9 +551,86 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
                         </div>
                     </div>
 
+                    {/* RAG File Selector Dropdown */}
+                    <AnimatePresence>
+                        {activeTool === 'rag' && (
+                            <motion.div 
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="rag-selector-container"
+                                style={{ overflow: 'visible' }}
+                            >
+                                <button 
+                                    className="rag-selector-toggle"
+                                    onClick={() => setShowRagSelector(!showRagSelector)}
+                                >
+                                    <Database size={14} />
+                                    <span>{selectedRagFiles.length} documents selected</span>
+                                    <ChevronRight size={14} className={`ml-auto transition-transform ${showRagSelector ? 'rotate-90' : ''}`} />
+                                </button>
+
+                                <AnimatePresence>
+                                    {showRagSelector && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                            className="rag-dropdown"
+                                            style={{ zIndex: 9999, position: 'absolute', bottom: '100%', left: 0, width: '100%' }}
+                                        >
+                                            <div className="rag-dropdown-header">
+                                                <span>Searchable Documents</span>
+                                                <button className="rag-select-all" onClick={toggleAllRagFiles}>
+                                                    {selectedRagFiles.length === documents.length ? 'Deselect All' : 'Select All'}
+                                                </button>
+                                            </div>
+                                            <div className="rag-dropdown-list">
+                                                {documents.length === 0 ? (
+                                                    <div className="rag-dropdown-empty">
+                                                        <FileText size={24} />
+                                                        <p>No documents found.</p>
+                                                    </div>
+                                                ) : (
+                                                    documents.map(doc => (
+                                                        <div 
+                                                            key={doc.id} 
+                                                            className="rag-dropdown-item"
+                                                            onClick={() => toggleRagFile(doc.file_name)}
+                                                        >
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={selectedRagFiles.includes(doc.file_name)}
+                                                                onChange={() => {}} 
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            />
+                                                            <FileText size={14} className="text-secondary" />
+                                                            <span>{doc.file_name}</span>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
                     <div className="input-wrapper focus-glow">
-                        <button className="input-action-btn" title="Attach File" onClick={() => fileInputRef.current?.click()}>
-                            {uploading ? <Loader2 className="animate-spin" size={18} /> : <Paperclip size={18} />}
+                        <button 
+                            className="input-action-btn" 
+                            title={activeTool === 'rag' ? 'Manage Selection' : 'Attach File'} 
+                            onClick={() => {
+                                if (activeTool === 'rag') {
+                                    setShowRagSelector(!showRagSelector);
+                                } else {
+                                    fileInputRef.current?.click();
+                                }
+                            }}
+                        >
+                            {uploading ? <Loader2 className="animate-spin" size={18} /> : 
+                             activeTool === 'rag' ? <Database size={18} /> : <Paperclip size={18} />}
                         </button>
                         <input
                             type="file"
@@ -512,7 +642,7 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                            placeholder={`Message ${currentModelName}...`}
+                            placeholder={toolConfig[activeTool].label}
                             rows={1}
                         />
                         <motion.button
@@ -521,6 +651,10 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
                             className="send-btn"
                             onClick={() => handleSend()}
                             disabled={!input.trim() || loading}
+                            style={{ 
+                                backgroundColor: toolConfig[activeTool].color,
+                                color: '#000'
+                            }}
                         >
                             <Send size={18} />
                         </motion.button>
@@ -528,7 +662,7 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
                 </div>
             </div>
 
-            {/* Sidebar Settings Integration */}
+            {/* Sidebar Settings */}
             <AnimatePresence>
                 {showMcpSettings && (
                     <motion.div
@@ -558,9 +692,9 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
                                         <button
                                             className={`write-toggle-btn ${mcpPermissions[service].writeAccess ? 'active' : ''}`}
                                             onClick={() => toggleServiceWriteAccess(service)}
-                                            title={mcpPermissions[service].writeAccess ? "Write Access Enabled" : "Enable Write Access"}
+                                            title={mcpPermissions[service].writeAccess ? 'Write Access Enabled' : 'Enable Write Access'}
                                         >
-                                            <Zap size={14} fill={mcpPermissions[service].writeAccess ? "currentColor" : "none"} />
+                                            <Zap size={14} fill={mcpPermissions[service].writeAccess ? 'currentColor' : 'none'} />
                                         </button>
                                         <label className="toggle-glass" title="Enable Service">
                                             <input
@@ -570,16 +704,11 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
                                             />
                                             <span className="slider" style={{
                                                 '--active-color': toolConfig[service].color
-                                            } as React.CSSProperties & Record<'--active-color', string>} />
+                                            } as any} />
                                         </label>
                                     </div>
                                 </div>
                             ))}
-                        </div>
-
-                        <div className="sidebar-footer">
-                            <p>Enabled: AI can read data from this service.</p>
-                            <p>Zap: AI can create/delete data in this service.</p>
                         </div>
                     </motion.div>
                 )}
@@ -623,7 +752,7 @@ function ServiceIcon({ icon, label, connected, permission, service, onClick }: S
     const handleToggle = async (e: React.MouseEvent) => {
         if (connected) {
             e.preventDefault();
-            if (confirm(`Disconnect ${label}?`)) {
+            if (confirm('Disconnect service?')) {
                 await fetch(`/api/google/disconnect?service=${service}`, { method: 'POST' });
                 window.location.reload();
             }
@@ -637,15 +766,11 @@ function ServiceIcon({ icon, label, connected, permission, service, onClick }: S
             className={`service-icon ${connected ? 'connected' : ''}`}
             onClick={handleToggle}
             style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-            title={`${label}: ${connected ? `Connected (${permission})` : 'Disconnected'}`}
+            title={label}
         >
             {icon}
             <div className="tooltip">
-                {label}: {connected ? (
-                    <span style={{ color: permission === 'Read-Write' ? '#3fb950' : '#d29922' }}>
-                        {permission}
-                    </span>
-                ) : 'Click to connect'}
+                {label}: {connected ? permission : 'Disconnected'}
             </div>
         </button>
     );

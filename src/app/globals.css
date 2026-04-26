@@ -773,3 +773,10 @@ body::before {
 .toast-notification.error {
   border-color: rgba(248, 81, 73, 0.4);
 }
+
+/* Tool Selector Styles */
+.tool-selector { display: flex; gap: 8px; justify-content: center; padding-bottom: 8px; }
+.tool-chip { display: flex; align-items: center; gap: 8px; padding: 6px 14px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: var(--transition); }
+.tool-chip:hover { border-color: var(--border-hover); color: var(--text-secondary); }
+.tool-chip.active { background: var(--accent-soft); border-color: var(--tool-color, var(--text-primary)); color: var(--text-primary); box-shadow: 0 0 10px rgba(255, 255, 255, 0.05); }
+.tool-chip.active svg { color: var(--tool-color, var(--text-primary)); }

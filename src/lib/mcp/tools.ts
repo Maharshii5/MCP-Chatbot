@@ -193,5 +193,24 @@ export const MCP_TOOLS: ChatCompletionTool[] = [
                 },
             },
         },
+    },
+    {
+        type: "function",
+        function: {
+            name: "image_generate",
+            description: "Generate a synthetic image from a text description. Use this when the user asks for an image, drawing, or visual representation.",
+            parameters: {
+                type: "object",
+                required: ["prompt"],
+                properties: {
+                    prompt: { type: "string", description: "Detailed description of the image to generate" },
+                    aspectRatio: { 
+                        type: "string", 
+                        description: "The aspect ratio of the image",
+                        enum: ["1:1", "16:9", "4:3", "3:4"]
+                    },
+                },
+            },
+        },
     }
 ];

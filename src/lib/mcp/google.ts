@@ -14,7 +14,7 @@ export async function getGoogleAuthClient(userId: string) {
     }
 
     if (!profile.google_access_token) {
-        throw new Error('No Google Access Token found. Please click the "Connect Gmail" or "Connect Calendar" icon above to authorize access.');
+        throw new Error('Google Workspace not connected. Please click the service icon in the header to authorize access.');
     }
 
     const oauth2Client = new google.auth.OAuth2(
