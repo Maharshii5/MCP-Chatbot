@@ -16,6 +16,32 @@ export default function LoginPage() {
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
 
+    const getFriendlyAuthError = (rawMessage: string) => {
+        const message = rawMessage.toLowerCase();
+
+        if (message.includes('email not confirmed')) {
+            return 'Your account exists, but the email is not verified yet. Please verify it from your inbox before signing in.';
+        }
+
+        if (message.includes('invalid login credentials') || message.includes('invalid_credentials')) {
+            return 'Invalid email or password. If you just signed up, confirm the email first or reset your password.';
+        }
+
+        if (message.includes('user already registered')) {
+            return 'An account with this email already exists. Try signing in or use reset password.';
+        }
+
+        if (message.includes('signup is disabled')) {
+            return 'Email signup is currently disabled in Supabase Auth settings.';
+        }
+
+        if (message.includes('provider is not enabled')) {
+            return 'This auth provider is not enabled in Supabase yet.';
+        }
+
+        return rawMessage;
+    };
+
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const modeParam = params.get('mode');
@@ -49,7 +75,7 @@ export default function LoginPage() {
                 if (error) throw error;
                 router.push('/');
             } else if (mode === 'signup') {
-                const { error } = await supabase.auth.signUp({ 
+                const { data, error } = await supabase.auth.signUp({ 
                     email, 
                     password,
                     options: {
@@ -57,15 +83,26 @@ export default function LoginPage() {
                     }
                 });
                 if (error) throw error;
-                setMessage('Verification email sent! Please check your inbox.');
-                setMode('login');
+
+                if (!data.user) {
+                    throw new Error('Signup did not complete. Please check your Supabase email signup settings.');
+                }
+
+                if (data.session) {
+                    setMessage('Account created successfully. You are now signed in.');
+                    router.push('/');
+                    return;
+                }
+
+                setMessage(`Account created for ${email}. Check your inbox and spam folder for the verification email before signing in.`);
+                setMode('signup');
             } else if (mode === 'reset-password') {
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
                     redirectTo: `${window.location.origin}/login?mode=update-password`,
                 });
                 if (error) throw error;
-                setMessage('Password reset link sent! Check your email.');
-                setMode('login');
+                setMessage(`If an account exists for ${email}, a password reset email has been sent. Check inbox and spam.`);
+                setMode('reset-password');
             } else if (mode === 'update-password') {
                 if (password.length < 6) {
                     throw new Error('Password must be at least 6 characters long.');
@@ -80,8 +117,9 @@ export default function LoginPage() {
                 setMode('login');
                 router.replace('/login');
             }
-        } catch (err: any) {
-            setError(err.message || 'An unexpected error occurred');
+        } catch (err: unknown) {
+            const rawMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+            setError(getFriendlyAuthError(rawMessage));
         } finally {
             setLoading(false);
         }
