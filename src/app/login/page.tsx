@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { LogIn, UserPlus, Key, Mail, ArrowLeft, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-type AuthMode = 'login' | 'signup' | 'reset-password';
+type AuthMode = 'login' | 'signup' | 'reset-password' | 'update-password';
 
 export default function LoginPage() {
     const supabase = createClient();
@@ -15,6 +15,22 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const modeParam = params.get('mode');
+        const errorParam = params.get('error');
+
+        if (modeParam === 'signup' || modeParam === 'reset-password' || modeParam === 'update-password') {
+            setMode(modeParam);
+        } else {
+            setMode('login');
+        }
+
+        if (errorParam === 'auth-callback-failed') {
+            setError('Authentication callback failed. Please try again.');
+        }
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -25,6 +41,7 @@ export default function LoginPage() {
         const formData = new FormData(e.target as HTMLFormElement);
         const email = formData.get('email') as string;
         const password = formData.get('password') as string;
+        const confirmPassword = formData.get('confirmPassword') as string;
 
         try {
             if (mode === 'login') {
@@ -49,6 +66,19 @@ export default function LoginPage() {
                 if (error) throw error;
                 setMessage('Password reset link sent! Check your email.');
                 setMode('login');
+            } else if (mode === 'update-password') {
+                if (password.length < 6) {
+                    throw new Error('Password must be at least 6 characters long.');
+                }
+                if (password !== confirmPassword) {
+                    throw new Error('Passwords do not match.');
+                }
+
+                const { error } = await supabase.auth.updateUser({ password });
+                if (error) throw error;
+                setMessage('Password updated successfully. You can sign in now.');
+                setMode('login');
+                router.replace('/login');
             }
         } catch (err: any) {
             setError(err.message || 'An unexpected error occurred');
@@ -82,7 +112,7 @@ export default function LoginPage() {
             alignItems: 'center',
             justifyContent: 'center',
             background: '#0d1117',
-            backgroundimage: 'radial-gradient(circle at 50% 50%, rgba(88, 166, 255, 0.05) 0%, transparent 50%)',
+            backgroundImage: 'radial-gradient(circle at 50% 50%, rgba(88, 166, 255, 0.05) 0%, transparent 50%)',
             color: 'white',
             fontFamily: 'Inter, sans-serif',
             overflow: 'hidden'
@@ -121,44 +151,48 @@ export default function LoginPage() {
                             boxShadow: '0 8px 32px rgba(88, 166, 255, 0.3)'
                         }}>
                             {mode === 'signup' ? <UserPlus size={32} color="white" /> : 
-                             mode === 'reset-password' ? <Key size={32} color="white" /> :
+                             mode === 'reset-password' || mode === 'update-password' ? <Key size={32} color="white" /> :
                              <LogIn size={32} color="white" />}
                         </div>
                         <h1 style={{ fontSize: '1.75rem', fontWeight: '800', marginBottom: '0.25rem', letterSpacing: '-0.02em' }}>
                             {mode === 'login' ? 'Welcome Back' : 
                              mode === 'signup' ? 'Create Account' : 
-                             'Reset Password'}
+                             mode === 'reset-password' ? 'Reset Password' :
+                             'Choose a New Password'}
                         </h1>
                         <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '0.875rem' }}>
                             {mode === 'login' ? 'Access your AI workstation' : 
                              mode === 'signup' ? 'Join the future of automation' : 
-                             'We will send you a recovery link'}
+                             mode === 'reset-password' ? 'We will send you a recovery link' :
+                             'Set a new password for your account'}
                         </p>
                     </div>
 
                     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                        <div>
-                            <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: 'rgba(255, 255, 255, 0.4)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>Email Address</label>
-                            <div style={{ position: 'relative' }}>
-                                <Mail size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255, 255, 255, 0.3)' }} />
-                                <input
-                                    name="email"
-                                    type="email"
-                                    required
-                                    placeholder="admin@nexus.ai"
-                                    style={{
-                                        width: '100%',
-                                        padding: '0.8rem 1rem 0.8rem 2.5rem',
-                                        background: 'rgba(0, 0, 0, 0.3)',
-                                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                                        borderRadius: '10px',
-                                        color: 'white',
-                                        outline: 'none',
-                                        fontSize: '0.9rem'
-                                    }}
-                                />
+                        {mode !== 'update-password' && (
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: '700', color: 'rgba(255, 255, 255, 0.4)', textTransform: 'uppercase', marginBottom: '0.5rem', letterSpacing: '0.05em' }}>Email Address</label>
+                                <div style={{ position: 'relative' }}>
+                                    <Mail size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255, 255, 255, 0.3)' }} />
+                                    <input
+                                        name="email"
+                                        type="email"
+                                        required
+                                        placeholder="admin@nexus.ai"
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.8rem 1rem 0.8rem 2.5rem',
+                                            background: 'rgba(0, 0, 0, 0.3)',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                                            borderRadius: '10px',
+                                            color: 'white',
+                                            outline: 'none',
+                                            fontSize: '0.9rem'
+                                        }}
+                                    />
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {mode !== 'reset-password' && (
                             <div>
@@ -180,6 +214,26 @@ export default function LoginPage() {
                                         fontSize: '0.9rem'
                                     }}
                                 />
+                                {mode === 'update-password' && (
+                                    <input
+                                        name="confirmPassword"
+                                        type="password"
+                                        required
+                                        minLength={6}
+                                        placeholder="Confirm new password"
+                                        style={{
+                                            width: '100%',
+                                            padding: '0.8rem 1rem',
+                                            background: 'rgba(0, 0, 0, 0.3)',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                                            borderRadius: '10px',
+                                            color: 'white',
+                                            outline: 'none',
+                                            fontSize: '0.9rem',
+                                            marginTop: '0.75rem'
+                                        }}
+                                    />
+                                )}
                                 {mode === 'login' && (
                                     <button 
                                         type="button" 
@@ -228,7 +282,8 @@ export default function LoginPage() {
                             {loading ? <Loader2 className="animate-spin" size={18} /> : 
                              mode === 'login' ? 'Sign In' : 
                              mode === 'signup' ? 'Create Account' : 
-                             'Send Reset Link'}
+                             mode === 'reset-password' ? 'Send Reset Link' :
+                             'Update Password'}
                         </button>
                         
                         {(mode === 'login' || mode === 'signup') && (
