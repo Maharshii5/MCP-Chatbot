@@ -2,6 +2,7 @@ import { getGroqClient, DEFAULT_MODEL } from '@/lib/groq/client';
 import { getOpenRouterClient, OPENROUTER_MODELS } from '@/lib/openrouter/client';
 import { MCP_TOOLS } from '@/lib/mcp/tools';
 import { searchDocuments } from '@/lib/rag/pinecone'; // Added import
+import { searchWeb } from '@/lib/search/tavily';
 import { dispatchToolCall } from '@/lib/mcp/dispatcher';
 import { ChatCompletionTool, ChatCompletionMessageParam } from 'groq-sdk/resources/chat/completions';
 
@@ -59,6 +60,35 @@ function parseMalformedFunctionTag(raw: string): { name: string; args: Record<st
     } catch {
         return { name, args: {} };
     }
+}
+
+function shouldAutoSearchWeb(message: string) {
+    const text = message.toLowerCase();
+
+    const temporalSignals = /\b(today|tonight|now|currently|current|latest|recent|recently|live|breaking|yesterday|tomorrow|this week|this month|this year)\b/;
+    const domainSignals = /\b(score|winner|won|match|game|fixture|standings|price|stock|market|weather|forecast|news|headline|result|results|election|traffic|flight|train|crypto|bitcoin|ipl|nba|nfl|cricket|football|soccer)\b/;
+    const explicitSearchSignals = /\b(search|look up|lookup|find out|check|verify)\b/;
+
+    return temporalSignals.test(text) || (domainSignals.test(text) && explicitSearchSignals.test(text));
+}
+
+async function buildWebContext(query: string) {
+    const webResult = await searchWeb(query);
+    const topResults = webResult.results.slice(0, 5)
+        .map((r: any, index: number) => {
+            const dateSuffix = r.published_date ? ` (${r.published_date})` : '';
+            return `[Web Source ${index + 1}] ${r.title}${dateSuffix}\n${r.content}\nURL: ${r.url}`;
+        })
+        .join('\n\n');
+
+    const answerBlock = webResult.answer
+        ? `TAVILY DIRECT ANSWER:\n${webResult.answer}\n\n`
+        : '';
+
+    return {
+        webResult,
+        content: `${answerBlock}WEB SEARCH RESULTS FOR "${query}":\n${topResults || 'No relevant web results found.'}\n\nINSTRUCTION: Answer the user's question using the web search evidence above. Prefer the direct Tavily answer when it is present, and cite the most relevant source in plain language.`
+    };
 }
 
 
@@ -279,6 +309,49 @@ export async function streamChat(
                 currentTools = MCP_TOOLS.filter(t => t.function?.name !== 'document_search');
             } catch (err) {
                 console.error('[Proactive RAG] Search failed:', err);
+            }
+        }
+    }
+
+    if (toolPreference === 'web') {
+        const lastUserMsg = messages[messages.length - 1];
+        if (lastUserMsg && lastUserMsg.role === 'user') {
+            try {
+                const query = lastUserMsg.content as string;
+                console.log(`[Proactive Web] Searching for: "${query}"`);
+
+                const { webResult, content } = await buildWebContext(query);
+
+                contextInjection = {
+                    role: 'system',
+                    content
+                };
+                console.log(`[Proactive Web] Injected ${webResult.results.length} results.`);
+
+                currentTools = MCP_TOOLS.filter(t => t.function?.name !== 'web_search');
+            } catch (err) {
+                console.error('[Proactive Web] Search failed:', err);
+            }
+        }
+    }
+
+    if ((!toolPreference || toolPreference === 'default') && !contextInjection) {
+        const lastUserMsg = messages[messages.length - 1];
+        if (lastUserMsg && lastUserMsg.role === 'user' && typeof lastUserMsg.content === 'string' && shouldAutoSearchWeb(lastUserMsg.content)) {
+            try {
+                const query = lastUserMsg.content;
+                console.log(`[Auto Web] Searching for time-sensitive query: "${query}"`);
+                const { webResult, content } = await buildWebContext(query);
+
+                contextInjection = {
+                    role: 'system',
+                    content
+                };
+                console.log(`[Auto Web] Injected ${webResult.results.length} results.`);
+
+                currentTools = MCP_TOOLS.filter(t => t.function?.name !== 'web_search');
+            } catch (err) {
+                console.error('[Auto Web] Search failed:', err);
             }
         }
     }

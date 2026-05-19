@@ -14,9 +14,11 @@ export async function searchWeb(query: string) {
         body: JSON.stringify({
             api_key: apiKey,
             query,
-            search_depth: 'basic',
+            search_depth: 'advanced',
             include_answer: true,
+            include_raw_content: false,
             max_results: 5,
+            topic: 'general',
         }),
     });
 
@@ -30,13 +32,25 @@ export async function searchWeb(query: string) {
     console.log('Tavily raw data:', JSON.stringify(data).slice(0, 500));
 
     if (!data.results || !Array.isArray(data.results)) {
-        return { message: "No search results found for this query.", results: [] };
+        return {
+            query,
+            answer: data.answer || null,
+            results: [],
+        };
     }
 
-    return data.results.map((r: any) => ({
+    const results = data.results.map((r: any) => ({
         title: r.title || 'No Title',
         url: r.url || '#',
         content: r.content || r.snippet || 'No content available.',
         snippet: r.snippet || r.content?.slice(0, 100) || 'No snippet available.',
+        score: r.score ?? null,
+        published_date: r.published_date || null,
     }));
+
+    return {
+        query,
+        answer: data.answer || null,
+        results,
+    };
 }

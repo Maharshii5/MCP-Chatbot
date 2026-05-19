@@ -860,3 +860,219 @@ body::before {
 .animate-spin {
   animation: spin 1s linear infinite;
 }
+
+.rag-manager {
+  width: 100%;
+  max-width: 960px;
+  padding: 1.5rem 1.75rem 2rem;
+}
+
+.rag-header {
+  margin-bottom: 1.25rem;
+}
+
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.title-icon {
+  color: var(--text-primary);
+}
+
+.header-subtitle {
+  color: var(--text-secondary);
+  max-width: 760px;
+}
+
+.upload-section {
+  margin-bottom: 1.5rem;
+}
+
+.upload-card {
+  display: block;
+  cursor: pointer;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 18px;
+  padding: 1rem 1.1rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.upload-card:hover {
+  border-color: rgba(88, 166, 255, 0.55);
+  background: linear-gradient(180deg, rgba(88, 166, 255, 0.08), rgba(255, 255, 255, 0.03));
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  transform: translateY(-1px);
+}
+
+.upload-card.uploading {
+  cursor: progress;
+}
+
+.upload-content {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.upload-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.upload-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: fit-content;
+  padding: 0.65rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(88, 166, 255, 0.32);
+  background: rgba(88, 166, 255, 0.12);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.upload-label {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.upload-hint {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.documents-section {
+  margin-top: 1rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.select-all-btn {
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+}
+
+.doc-loading,
+.empty-docs {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 1.2rem 0.25rem;
+  color: var(--text-secondary);
+}
+
+.doc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.9rem;
+}
+
+.doc-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+
+.doc-card.selected {
+  border-color: rgba(188, 140, 255, 0.55);
+  background: rgba(188, 140, 255, 0.09);
+}
+
+.doc-selection-indicator {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.doc-info {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.doc-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.doc-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.doc-date {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.delete-btn {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.selection-status {
+  margin-top: 1.2rem;
+}
+
+.status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--text-secondary);
+}
+
+.status-item .active {
+  color: #3fb950;
+}
+
+@media (max-width: 768px) {
+  .rag-manager {
+    padding: 1rem 1rem 1.5rem;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .upload-trigger {
+    width: 100%;
+    justify-content: center;
+  }
+}

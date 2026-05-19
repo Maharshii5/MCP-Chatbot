@@ -145,9 +145,14 @@ export default function RagManager() {
                         </div>
                     ) : (
                         <div className="upload-content">
-                            <Upload className="text-secondary" />
-                            <span>Click to upload PDF, Docx, or TXT</span>
-                            <span className="upload-hint">Max file size: 10MB</span>
+                            <div className="upload-copy">
+                                <div className="upload-trigger">
+                                    <Upload className="text-secondary" />
+                                    <span>Upload Documents</span>
+                                </div>
+                                <span className="upload-label">Click to upload PDF, Docx, or TXT</span>
+                                <span className="upload-hint">Max file size: 10MB</span>
+                            </div>
                         </div>
                     )}
                 </label>
