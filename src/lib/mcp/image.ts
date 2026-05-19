@@ -33,6 +33,12 @@ export async function generateImage(prompt: string, aspectRatio: string = "1:1")
         if (!genResponse.ok) {
             const errorText = await genResponse.text();
             console.error(`Kie.ai API Error: ${genResponse.status}`, errorText);
+            if (genResponse.status === 402 || genResponse.status === 403) {
+                throw new Error(`Kie.ai billing/auth error (${genResponse.status}). Check the KIE_AI_API_KEY and account balance. Raw response: ${errorText}`);
+            }
+            if (genResponse.status === 429) {
+                throw new Error(`Kie.ai quota/rate limit hit (429). Raw response: ${errorText}`);
+            }
             throw new Error(`Kie.ai API Error ${genResponse.status}: ${errorText}`);
         }
 
@@ -40,6 +46,9 @@ export async function generateImage(prompt: string, aspectRatio: string = "1:1")
 
         if (genData.code !== 200 || !genData.data?.taskId) {
             console.error("Kie.ai generation failed:", genData);
+            if (String(genData.msg || '').toLowerCase().match(/quota|billing|balance|insufficient|credit|rate/i)) {
+                throw new Error(`Kie.ai rejected the image request due to quota/billing: ${genData.msg}`);
+            }
             throw new Error(`Kie.ai Error: ${genData.msg || "Unknown error"}`);
         }
 
@@ -72,6 +81,9 @@ export async function generateImage(prompt: string, aspectRatio: string = "1:1")
             if (statusData.data?.status === "FAILED") {
                 const errorMsg = statusData.data?.errorMessage || "Unknown error";
                 console.error(`Image generation failed: ${errorMsg}`);
+                if (String(errorMsg).toLowerCase().match(/quota|billing|balance|insufficient|credit|rate/i)) {
+                    throw new Error(`Kie.ai task failed due to quota/billing: ${errorMsg}`);
+                }
                 throw new Error(`Image generation failed: ${errorMsg}`);
             }
 

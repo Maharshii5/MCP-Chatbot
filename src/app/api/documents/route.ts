@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { deleteDocumentVectors } from '@/lib/rag/pinecone';
 
 export async function GET() {
     try {
@@ -41,6 +42,15 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        const { data: document, error: lookupError } = await supabase
+            .from('documents')
+            .select('file_name')
+            .eq('id', id)
+            .eq('user_id', user.id)
+            .single();
+
+        if (lookupError) throw lookupError;
+
         const { error } = await supabase
             .from('documents')
             .delete()
@@ -48,6 +58,7 @@ export async function DELETE(req: Request) {
             .eq('user_id', user.id);
 
         if (error) throw error;
+        await deleteDocumentVectors(user.id, document.file_name);
 
         return NextResponse.json({ success: true });
     } catch (error) {

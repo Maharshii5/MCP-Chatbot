@@ -665,11 +665,23 @@ body::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: var(--transition);
+}
+
+.service-monitor-glass .service-icon.connected {
+  color: #3fb950;
+  background: rgba(63, 185, 80, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(63, 185, 80, 0.3), 0 0 12px rgba(63, 185, 80, 0.2);
 }
 
 .service-monitor-glass .service-icon:hover {
   background: var(--accent-soft);
   color: var(--text-primary);
+}
+
+.service-monitor-glass .service-icon.connected:hover {
+  color: #7ee787;
+  background: rgba(63, 185, 80, 0.18);
 }
 
 .service-monitor-glass .service-icon .tooltip {
@@ -708,6 +720,30 @@ body::before {
   align-items: center;
   gap: 10px;
   color: var(--text-secondary);
+}
+
+.service-setting-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.service-connection-badge {
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.service-connection-badge.connected {
+  color: #3fb950;
+}
+
+.service-connection-badge.disconnected {
+  color: var(--text-muted);
+}
+
+.setting-item-glass.connected {
+  border-color: rgba(63, 185, 80, 0.28);
+  background: rgba(63, 185, 80, 0.06);
 }
 
 .setting-icon {

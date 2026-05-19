@@ -42,6 +42,12 @@ export async function POST(req: NextRequest) {
         await upsertDocument(user.id, file.name, formattedChunks);
 
         console.log('Step 4: Saving metadata to Supabase...');
+        await supabase
+            .from('documents')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('file_name', file.name);
+
         const { error } = await supabase.from('documents').insert({
             user_id: user.id,
             file_name: file.name,
@@ -56,6 +62,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, fileName: file.name });
     } catch (error) {
         console.error('Upload Error:', error);
+        if (error instanceof Error && error.message.includes('RAG index mismatch')) {
+            console.error('Upload aborted due to embedding/index mismatch.');
+        }
         const message = error instanceof Error ? error.message : 'Upload failed';
         return NextResponse.json({ error: message }, { status: 500 });
     }

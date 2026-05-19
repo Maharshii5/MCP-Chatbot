@@ -1,14 +1,17 @@
 import { OpenAI } from "openai";
+import { resolveAppOrigin } from '@/lib/appOrigin';
 
 // Only initialize on server to prevent browser-side "Missing API Key" errors
 export const getOpenRouterClient = () => {
   if (typeof window !== 'undefined') return null;
+
+  const appOrigin = resolveAppOrigin() || "https://mcp-chatbot.local";
   
   return new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
     apiKey: process.env.OPENROUTER_API_KEY || "dummy",
     defaultHeaders: {
-      "HTTP-Referer": "http://localhost:3000",
+      "HTTP-Referer": appOrigin,
       "X-Title": "MCP Chatbot",
     }
   });

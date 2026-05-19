@@ -1,5 +1,4 @@
 import { Pinecone } from '@pinecone-database/pinecone';
-import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 
 if (!process.env.PINECONE_API_KEY) console.warn('Missing PINECONE_API_KEY');
 if (!process.env.PINECONE_INDEX) console.warn('Missing PINECONE_INDEX');
@@ -9,29 +8,95 @@ const pc = new Pinecone({
     apiKey: process.env.PINECONE_API_KEY || '',
 });
 
-export const embeddings = new GoogleGenerativeAIEmbeddings({
-    apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY!,
-    modelName: "gemini-embedding-001", // Use working model
-});
-
+const EMBEDDING_MODEL = process.env.RAG_EMBEDDING_MODEL || "gemini-embedding-001";
+const DEFAULT_EMBEDDING_DIMENSION = Number(process.env.RAG_EMBEDDING_DIMENSION || 768);
 const wait = (ms: number) => new Promise(res => setTimeout(res, ms));
+let indexDimensionPromise: Promise<number> | null = null;
+
+function getIndex() {
+    const indexName = process.env.PINECONE_INDEX!;
+    return pc.Index(indexName);
+}
+
+async function getIndexDimension() {
+    if (!indexDimensionPromise) {
+        indexDimensionPromise = pc.describeIndex(process.env.PINECONE_INDEX!).then(indexDescription => {
+            if (!indexDescription.dimension) {
+                throw new Error(`Pinecone index "${process.env.PINECONE_INDEX}" does not expose a dimension.`);
+            }
+
+            return indexDescription.dimension;
+        });
+    }
+
+    return indexDimensionPromise;
+}
+
+async function createEmbedding(text: string, taskType?: 'RETRIEVAL_DOCUMENT' | 'RETRIEVAL_QUERY') {
+    const outputDimensionality = await getIndexDimension();
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:embedContent`, {
+        method: 'POST',
+        headers: {
+            'x-goog-api-key': process.env.GOOGLE_GENERATIVE_AI_API_KEY!,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            content: {
+                parts: [{ text }],
+            },
+            output_dimensionality: outputDimensionality || DEFAULT_EMBEDDING_DIMENSION,
+            ...(taskType ? { task_type: taskType } : {}),
+        }),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Gemini embedding request failed (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    const embedding = data?.embedding?.values;
+    if (!Array.isArray(embedding) || embedding.length === 0) {
+        throw new Error(`Gemini embedding response was empty for model ${EMBEDDING_MODEL}.`);
+    }
+
+    if (embedding.length !== outputDimensionality) {
+        throw new Error(`Gemini embedding dimension mismatch: expected ${outputDimensionality}, got ${embedding.length}.`);
+    }
+
+    return embedding;
+}
+
+export async function deleteDocumentVectors(userId: string, fileName: string) {
+    const index = getIndex();
+    await index.deleteMany({
+        user_id: userId,
+        fileName,
+    });
+}
 
 export async function searchDocuments(userId: string, query: string, activeFileNames?: string[]) {
-    const indexName = process.env.PINECONE_INDEX!;
-    const index = pc.Index(indexName);
+    const index = getIndex();
 
     console.log(`Searching documents for user ${userId} with query: "${query}"`);
     if (activeFileNames && activeFileNames.length > 0) {
         console.log(`Filtering to active files: ${activeFileNames.join(', ')}`);
     }
 
-    const queryEmbedding = await embeddings.embedQuery(query);
+    const queryEmbedding = await createEmbedding(query, 'RETRIEVAL_QUERY');
     console.log('Query embedding generated.');
+
+    const filter: Record<string, unknown> = { user_id: { '$eq': userId } };
+    if (activeFileNames?.length === 1) {
+        filter.fileName = { '$eq': activeFileNames[0] };
+    } else if (activeFileNames && activeFileNames.length > 1) {
+        filter.fileName = { '$in': activeFileNames };
+    }
 
     const queryResponse = await index.query({
         vector: queryEmbedding,
-        topK: 10, // Get more results to filter
-        filter: { user_id: { '$eq': userId } },
+        topK: 10,
+        filter,
         includeMetadata: true,
     });
 
@@ -42,12 +107,6 @@ export async function searchDocuments(userId: string, query: string, activeFileN
         fileName: (match.metadata as any).fileName,
         score: match.score,
     }));
-
-    // Filter by active files if specified
-    if (activeFileNames && activeFileNames.length > 0) {
-        results = results.filter(r => activeFileNames.includes(r.fileName));
-        console.log(`Filtered to ${results.length} results from active files.`);
-    }
 
     // Take top 5 after filtering
     results = results.slice(0, 5);
@@ -60,10 +119,12 @@ export async function searchDocuments(userId: string, query: string, activeFileN
 }
 
 export async function upsertDocument(userId: string, fileName: string, chunks: { text: string; metadata: any }[]) {
-    const indexName = process.env.PINECONE_INDEX!;
-    const index = pc.Index(indexName);
+    const index = getIndex();
 
     console.log(`Indexing document "${fileName}" for user ${userId} (${chunks.length} chunks)...`);
+    const expectedDimension = await getIndexDimension();
+    await deleteDocumentVectors(userId, fileName);
+    console.log(`[RAG] Cleared any existing vectors for "${fileName}" before re-indexing.`);
 
     const vectors = [];
     const BATCH_SIZE = 2; // Reduced batch size for stability on free tier
@@ -78,8 +139,12 @@ export async function upsertDocument(userId: string, fileName: string, chunks: {
                 while (retries < 3) {
                     try {
                         const start = Date.now();
-                        const embedding = await embeddings.embedQuery(chunk.text);
+                        const embedding = await createEmbedding(chunk.text, 'RETRIEVAL_DOCUMENT');
                         console.log(`[RAG] Embedding chunk ${i + j} took ${Date.now() - start}ms`);
+                        if (embedding.length !== expectedDimension) {
+                            throw new Error(`Embedding dimension changed mid-run: expected ${expectedDimension}, got ${embedding.length}`);
+                        }
+
                         return {
                             id: `${userId}_${fileName}_${i + j}`.replace(/[^a-zA-Z0-9]/g, '_'),
                             values: embedding,
@@ -88,6 +153,8 @@ export async function upsertDocument(userId: string, fileName: string, chunks: {
                                 text: chunk.text,
                                 user_id: userId,
                                 fileName,
+                                embeddingModel: EMBEDDING_MODEL,
+                                embeddingDimension: embedding.length,
                             },
                         };
                     } catch (e: any) {

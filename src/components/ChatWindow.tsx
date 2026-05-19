@@ -682,12 +682,20 @@ export default function ChatWindow({ conversationId, onConversationCreated }: Ch
 
                         <div className="settings-list">
                             {(Object.keys(mcpPermissions) as Array<keyof ServicePermissions>).map(service => (
-                                <div key={service} className="setting-item-glass">
+                                <div
+                                    key={service}
+                                    className={`setting-item-glass ${status[service] ? 'connected' : 'disconnected'}`}
+                                >
                                     <div className="setting-info">
                                         <div className="setting-icon" style={{ color: toolConfig[service].color }}>
                                             {toolConfig[service].icon}
                                         </div>
-                                        <span>{service.charAt(0).toUpperCase() + service.slice(1)}</span>
+                                        <div className="service-setting-copy">
+                                            <span>{service.charAt(0).toUpperCase() + service.slice(1)}</span>
+                                            <span className={`service-connection-badge ${status[service] ? 'connected' : 'disconnected'}`}>
+                                                {status[service] ? 'Connected' : 'Disconnected'}
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="setting-controls">
                                         <button

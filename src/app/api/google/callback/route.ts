@@ -1,21 +1,24 @@
 import { google } from 'googleapis';
 import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
+import { getGoogleRedirectUrl } from '@/lib/googleOAuth';
+import { resolveAbsoluteUrl } from '@/lib/appOrigin';
 
 export async function GET(request: Request) {
-    const { searchParams, origin } = new URL(request.url);
+    const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
     const state = searchParams.get('state') || '';
     const [userId, targetService] = state.split(':');
+    const redirectUrl = getGoogleRedirectUrl(request.url);
 
     if (!code || !userId) {
-        return NextResponse.redirect(`${origin}/?error=invalid-callback`);
+        return NextResponse.redirect(resolveAbsoluteUrl('/?error=invalid-callback', request.url));
     }
 
     const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
-        process.env.GOOGLE_REDIRECT_URL
+        redirectUrl
     );
 
     try {
@@ -60,7 +63,7 @@ export async function GET(request: Request) {
             });
         }
 
-        const response = NextResponse.redirect(`${origin}/?success=google-connected`);
+        const response = NextResponse.redirect(resolveAbsoluteUrl('/?success=google-connected', request.url));
         response.cookies.set('demo-google-access-token', tokens.access_token || '', {
             path: '/',
             maxAge: 60 * 60 * 24 * 30,
@@ -91,6 +94,6 @@ export async function GET(request: Request) {
         return response;
     } catch (error) {
         console.error('Google OAuth Callback Error:', error);
-        return NextResponse.redirect(`${origin}/?error=google-auth-failed`);
+        return NextResponse.redirect(resolveAbsoluteUrl('/?error=google-auth-failed', request.url));
     }
 }
