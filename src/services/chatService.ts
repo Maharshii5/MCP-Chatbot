@@ -401,8 +401,10 @@ export async function streamChat(
 
     // CHECK FOR IMAGE GENERATION
     // Search entire conversation for the generated image tag
-    const imageToolResult = conversationWithTools.find((m: any) =>
-        (typeof m.content === 'string' && m.content.includes('![Generated Image]'))
+    const imageToolResult = [...conversationWithTools].reverse().find((m: any) =>
+        m.role === 'tool' &&
+        typeof m.content === 'string' &&
+        m.content.includes('![Generated Image]')
     );
 
     if (imageToolResult) {

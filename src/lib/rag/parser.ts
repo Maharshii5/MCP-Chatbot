@@ -1,4 +1,4 @@
-// Polyfill for pdf-parse in Node.js environment
+// Polyfills required by pdfjs-dist in Node.js / Next server environment.
 if (typeof globalThis !== 'undefined') {
     (globalThis as any).DOMMatrix = (globalThis as any).DOMMatrix || class { };
     (globalThis as any).ImageData = (globalThis as any).ImageData || class { };
@@ -7,7 +7,38 @@ if (typeof globalThis !== 'undefined') {
 }
 
 import mammoth from 'mammoth';
-import { PDFParse } from 'pdf-parse';
+
+async function parsePdf(buffer: Buffer): Promise<string> {
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    const documentParams: any = {
+        data: new Uint8Array(buffer),
+        disableWorker: true,
+        useWorkerFetch: false,
+        isEvalSupported: false,
+    };
+    const loadingTask = pdfjs.getDocument(documentParams);
+
+    const pdf = await loadingTask.promise;
+    const pages: string[] = [];
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+        const page = await pdf.getPage(pageNumber);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+            .map((item: any) => ('str' in item ? item.str : ''))
+            .filter(Boolean)
+            .join(' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (pageText) {
+            pages.push(pageText);
+        }
+    }
+
+    await pdf.destroy();
+    return pages.join('\n\n');
+}
 
 export async function parseDocument(buffer: Buffer, mimeType: string, fileName?: string): Promise<string> {
     try {
@@ -19,10 +50,7 @@ export async function parseDocument(buffer: Buffer, mimeType: string, fileName?:
 
         if (type === 'application/pdf') {
             console.log('Parsing PDF content...');
-            // In pdf-parse ^2.4.5, PDFParse is a class instance.
-            const parser = new PDFParse({ data: buffer });
-            const data = await parser.getText();
-            const content = data.text || '';
+            const content = await parsePdf(buffer);
             if (content.trim().length === 0) {
                 console.warn('PDF parsed but returned no text! (Might be an image-only PDF)');
                 return "This PDF appears to be an image or scanned document without selectable text. MCP cannot read image-only PDFs yet.";

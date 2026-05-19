@@ -1,6 +1,8 @@
 // Kie.ai GPT Image 1 Generation
 export async function generateImage(prompt: string, aspectRatio: string = "1:1") {
     const KIE_API_KEY = process.env.KIE_AI_API_KEY;
+    const POLL_INTERVAL_MS = 3000;
+    const MAX_POLLS = 30;
 
     if (!KIE_API_KEY) {
         throw new Error("Missing KIE_AI_API_KEY");
@@ -55,9 +57,9 @@ export async function generateImage(prompt: string, aspectRatio: string = "1:1")
         const taskId = genData.data.taskId;
         console.log(`[ImageGen] Task created: ${taskId}, polling for completion...`);
 
-        // Step 2: Poll for completion (max 30 seconds, check every 2 seconds)
-        for (let i = 0; i < 15; i++) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+        // Step 2: Poll for completion (up to ~90 seconds, check every 3 seconds)
+        for (let i = 0; i < MAX_POLLS; i++) {
+            await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
 
             const statusResponse = await fetch(`https://api.kie.ai/api/v1/gpt4o-image/record-info?taskId=${taskId}`, {
                 headers: {
@@ -90,7 +92,23 @@ export async function generateImage(prompt: string, aspectRatio: string = "1:1")
             console.log(`[ImageGen] Poll ${i + 1}: ${statusData.data?.status || "PENDING"}`);
         }
 
-        throw new Error("Image generation timed out after 30 seconds");
+        // Final status fetch before giving up, in case the task completed between polls.
+        const finalStatusResponse = await fetch(`https://api.kie.ai/api/v1/gpt4o-image/record-info?taskId=${taskId}`, {
+            headers: {
+                "Authorization": `Bearer ${KIE_API_KEY}`
+            }
+        });
+
+        if (finalStatusResponse.ok) {
+            const finalStatusData = await finalStatusResponse.json();
+            if (finalStatusData.data?.status === "SUCCESS" && finalStatusData.data?.response?.resultUrls?.length > 0) {
+                const imageUrl = finalStatusData.data.response.resultUrls[0];
+                console.log(`[ImageGen] Final status check succeeded: ${imageUrl}`);
+                return `![Generated Image](${imageUrl})`;
+            }
+        }
+
+        throw new Error(`Image generation timed out after ${Math.round((MAX_POLLS * POLL_INTERVAL_MS) / 1000)} seconds`);
 
     } catch (error: any) {
         console.error("Image generation failed:", error);

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { FileText, Trash2, Upload, Loader2, CheckCircle, AlertCircle, Database, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -17,6 +17,7 @@ export default function RagManager() {
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         fetchDocuments();
@@ -136,26 +137,51 @@ export default function RagManager() {
             </div>
 
             <div className="upload-section">
-                <label className={`upload-card ${uploading ? 'uploading' : ''}`}>
-                    <input type="file" accept=".txt,.md,.pdf,.docx" onChange={handleUpload} disabled={uploading} hidden />
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".txt,.md,.pdf,.docx"
+                    onChange={handleUpload}
+                    disabled={uploading}
+                    hidden
+                />
+                <div className={`upload-card ${uploading ? 'uploading' : ''}`}>
                     {uploading ? (
                         <div className="upload-content">
                             <Loader2 className="animate-spin text-secondary" />
                             <span>Processing & Indexing...</span>
                         </div>
                     ) : (
-                        <div className="upload-content">
-                            <div className="upload-copy">
-                                <div className="upload-trigger">
+                        <div className="upload-content" style={{ display: 'flex', alignItems: 'center', gap: '0.9rem' }}>
+                            <div className="upload-copy" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                                <button
+                                    type="button"
+                                    className="upload-trigger"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.65rem',
+                                        width: 'fit-content',
+                                        padding: '0.75rem 1rem',
+                                        borderRadius: '12px',
+                                        border: '1px solid rgba(88, 166, 255, 0.45)',
+                                        background: 'rgba(88, 166, 255, 0.18)',
+                                        color: '#ffffff',
+                                        fontWeight: 700,
+                                        cursor: 'pointer',
+                                        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.22)'
+                                    }}
+                                >
                                     <Upload className="text-secondary" />
                                     <span>Upload Documents</span>
-                                </div>
-                                <span className="upload-label">Click to upload PDF, Docx, or TXT</span>
-                                <span className="upload-hint">Max file size: 10MB</span>
+                                </button>
+                                <span className="upload-label" style={{ color: 'var(--text-primary)' }}>Click to upload PDF, Docx, or TXT</span>
+                                <span className="upload-hint" style={{ color: 'var(--text-muted)' }}>Max file size: 10MB</span>
                             </div>
                         </div>
                     )}
-                </label>
+                </div>
             </div>
 
             <div className="documents-section">
