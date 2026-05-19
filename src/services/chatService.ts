@@ -356,12 +356,16 @@ export async function streamChat(
         }
     }
 
+    const now = new Date();
     // 2. Tool Resolution Phase Prompt
     const toolSystemPrompt: ChatCompletionMessageParam = {
         role: 'system',
         content: `You are the MCP Assistant, a professional workstation agent.
         
-        Current Time: ${new Date().toLocaleString()}
+        Current Date and Time: ${now.toLocaleString()}
+        Current ISO Time: ${now.toISOString()}
+        IMPORTANT: The current year is ${now.getFullYear()}. When creating calendar events, you MUST use the correct current year ${now.getFullYear()} and correctly format the ISO string with timezone (e.g., ${now.getFullYear()}-05-20T10:30:00+05:30). DO NOT use past years like 2023 or 2024.
+        
         User Environment: Windows Desktop
         
         OPERATIONAL GUIDELINES:
@@ -369,7 +373,7 @@ export async function streamChat(
         2. TOOL USAGE: Always use official tool_calls format. If a tool fails due to "Google Workspace not connected", encourage the user to click the corresponding service icon in the header bar.
         3. FILE OPERATIONS: Always read files (fs_read_file) before editing/writing.
         4. SEARCH: Use 'web_search' for real-time/web info. Use 'document_search' for local RAG knowledge.
-        5. GOOGLE WORKSPACE: Manage Gmail (read/search), Calendar (list/create), and Docs (read/create). Documents are stored in 'My Drive → MCP Chatbot'.
+        5. GOOGLE WORKSPACE: Manage Gmail (read/search), Calendar (list/create), Drive (search/list files), and Docs (read/create). Documents are stored in 'My Drive → MCP Chatbot'.
         6. IMAGES: Generate professional-grade images if requested.
         
         FAILURE PREVENTION:
