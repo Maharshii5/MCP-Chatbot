@@ -6,7 +6,7 @@ export const MCP_TOOLS: ChatCompletionTool[] = [
         type: "function",
         function: {
             name: "google_calendar_list_events",
-            description: "List upcoming events from Google Calendar",
+            description: "List upcoming events from Google Calendar. Use this for the user's own meetings, schedule, appointments, or calendar events.",
             parameters: {
                 type: "object",
                 properties: {
@@ -29,6 +29,11 @@ export const MCP_TOOLS: ChatCompletionTool[] = [
                     description: { type: "string", description: "Event description" },
                     start: { type: "string", description: "Start time (ISO string)" },
                     end: { type: "string", description: "End time (ISO string)" },
+                    attendees: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "List of email addresses of attendees to invite to the event (optional)"
+                    },
                 },
             },
         },
@@ -112,7 +117,7 @@ export const MCP_TOOLS: ChatCompletionTool[] = [
         type: "function",
         function: {
             name: "web_search",
-            description: "Search the web for real-time information, latest news, current stock prices, weather, or any data beyond the model's training cutoff. Use this whenever the user asks for 'today's' or 'current' information.",
+            description: "Search the web for real-time information, latest news, current stock prices, weather, or any data beyond the model's training cutoff. Do not use this for the user's personal Google Workspace data such as their own meetings or calendar schedule.",
             parameters: {
                 type: "object",
                 required: ["query"],

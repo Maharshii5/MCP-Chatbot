@@ -80,16 +80,37 @@ export async function listCalendarEvents(userId: string, params: { timeMin?: str
     return res.data.items;
 }
 
-export async function createCalendarEvent(userId: string, event: { summary: string; description?: string; start: string; end: string }) {
+export async function createCalendarEvent(userId: string, event: { summary: string; description?: string; start: string; end: string; attendees?: any }) {
     const auth = await getGoogleAuthClient(userId);
     const calendar = google.calendar({ version: 'v3', auth });
+    let attendeesList: { email: string }[] | undefined = undefined;
+    if (event.attendees) {
+        if (Array.isArray(event.attendees)) {
+            attendeesList = event.attendees.map(item => {
+                if (typeof item === 'string') {
+                    return { email: item.trim() };
+                } else if (item && typeof item === 'object' && 'email' in item) {
+                    return { email: String(item.email).trim() };
+                }
+                return null;
+            }).filter((item): item is { email: string } => !!item);
+        } else if (typeof event.attendees === 'string') {
+            attendeesList = event.attendees
+                .split(',')
+                .map(email => ({ email: email.trim() }))
+                .filter(item => item.email.length > 0);
+        }
+    }
+
     const res = await calendar.events.insert({
+        sendUpdates: 'all',
         calendarId: 'primary',
         requestBody: {
             summary: event.summary,
             description: event.description,
             start: { dateTime: event.start },
             end: { dateTime: event.end },
+            attendees: attendeesList,
         },
     });
     return res.data;

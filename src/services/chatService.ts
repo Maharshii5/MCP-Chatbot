@@ -62,8 +62,21 @@ function parseMalformedFunctionTag(raw: string): { name: string; args: Record<st
     }
 }
 
+function isPersonalCalendarQuery(message: string) {
+    const text = message.toLowerCase();
+
+    const calendarSignals = /\b(calendar|meeting|meetings|schedule|scheduled|appointment|appointments|event|events|invite|invites)\b/;
+    const personalSignals = /\b(my|me)\b|\bdo i have\b|\bwhat do i have\b|\bwhat's on my\b|\bwhat is on my\b|\bam i\b/;
+
+    return calendarSignals.test(text) && personalSignals.test(text);
+}
+
 function shouldAutoSearchWeb(message: string) {
     const text = message.toLowerCase();
+
+    if (isPersonalCalendarQuery(text)) {
+        return false;
+    }
 
     const temporalSignals = /\b(today|tonight|now|currently|current|latest|recent|recently|live|breaking|yesterday|tomorrow|this week|this month|this year)\b/;
     const domainSignals = /\b(score|winner|won|match|game|fixture|standings|price|stock|market|weather|forecast|news|headline|result|results|election|traffic|flight|train|crypto|bitcoin|ipl|nba|nfl|cricket|football|soccer)\b/;
@@ -374,7 +387,8 @@ export async function streamChat(
         3. FILE OPERATIONS: Always read files (fs_read_file) before editing/writing.
         4. SEARCH: Use 'web_search' for real-time/web info. Use 'document_search' for local RAG knowledge.
         5. GOOGLE WORKSPACE: Manage Gmail (read/search), Calendar (list/create), Drive (search/list files), and Docs (read/create). Documents are stored in 'My Drive → MCP Chatbot'.
-        6. IMAGES: Generate professional-grade images if requested.
+        6. CALENDAR INTENT: If the user is asking about their own meetings, schedule, appointments, or events, prefer Google Calendar tools instead of web search. If the user mentions inviting someone or provides their email, extract the email address(es) and pass them in the 'attendees' field of the 'google_calendar_create_event' tool.
+        7. IMAGES: Generate professional-grade images if requested.
         
         FAILURE PREVENTION:
         - If a tool fails, explain exactly why (e.g. "Gmail access is not authorized") and provide the solution.
